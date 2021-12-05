@@ -1,0 +1,132 @@
+<sdf version='1.7'>
+  <world name='default'>
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>1</shadows>
+      <sky>
+        <clouds>
+          <speed>12</speed>
+        </clouds>
+      </sky>
+      <fog>
+        <type>linear</type>
+        <start>10</start>
+        <end>500</end>
+        <density>1</density>
+      </fog>
+    </scene>
+
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <model name="building_0">
+      <include>
+        <uri>../models/building</uri>
+        <pose>-5 -30 0 0 0 0</pose>
+        <name>building_0</name>
+      </include>
+    </model>
+    <model name="building_1">
+      <include>
+        <uri>../models/building</uri>
+        <pose>25 -30 0 0 0 0</pose>
+        <name>building_1</name>
+      </include>
+    </model>
+    <model name="building_2">
+      <include>
+        <uri>../models/building</uri>
+        <pose>5 30 0 0 0 0</pose>
+        <name>building_2</name>
+      </include>
+    </model>
+    <model name="building_3">
+      <include>
+        <uri>../models/building</uri>
+        <pose>-25 30 0 0 0 0</pose>
+        <name>building_3</name>
+      </include>
+    </model>
+
+    <model name="laser_0">
+      <static>false</static>
+      <pose>0 0 1 0 0 0</pose>
+      <link name="laser_link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.2 0.1 0.1</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <laser_retro>0</laser_retro>
+          <max_contacts>10</max_contacts>
+          <pose>0 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.2 .1 .1</size>
+            </box>
+          </geometry>
+        </collision>
+        <sensor name="laser" type="ray">
+          <pose>0 0 0.1 0 0 0</pose>
+          <visualize>true</visualize>
+          <update_rate>20</update_rate>
+          <ray>
+            <scan>
+              <horizontal>
+                <samples>5</samples>
+                <resolution>1</resolution>
+                <min_angle>0</min_angle>
+                <max_angle>6.28</max_angle>
+              </horizontal>
+              <vertical>
+                <samples>1</samples>
+                <resolution>1</resolution>
+                <min_angle>0.7</min_angle>
+                <max_angle>0.7</max_angle>
+              </vertical>
+            </scan>
+            <range>
+              <min>0.05</min>
+              <max>100.0</max>
+              <resolution>0.02</resolution>
+            </range>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.0</stddev>
+            </noise>
+          </ray>
+        </sensor>
+        <self_collide>0</self_collide>
+      </link>
+    </model>
+
+    <!-- <model name="drone_0">
+      <include>
+        <uri>../models/iris_virtual_ray</uri>
+        <pose>0 0 1 0 0 0</pose>
+        <name>drone_0</name>
+      </include>
+    </model> -->
+
+<!-- 
+    <gui fullscreen='0'>
+      <camera name='user_camera'>
+        <pose>-9.6407 49.4187 41.7671 0 0.6058 -1.55978</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui> -->
+
+  </world>
+</sdf>
+<!-- vim: set et fenc=utf-8 ff=unix sts=0 sw=2 ts=2 ft=xml: -->  
