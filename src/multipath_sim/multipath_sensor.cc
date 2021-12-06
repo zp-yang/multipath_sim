@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014 Open Source Robotics Foundation
+ * Copyright 2013 Open Source Robotics Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,177 +14,198 @@
  * limitations under the License.
  *
 */
+
 /*
- * Desc: Multipath plugin
+ * Desc: Modified ros laser scanner to check for GPS sat LOS & multipath
  * Author: ZP Yang
+ * Date: Dec 6 2021
  */
 
+#include <algorithm>
+#include <string>
+#include <assert.h>
+
+#include <gazebo/physics/World.hh>
+#include <gazebo/physics/HingeJoint.hh>
+#include <gazebo/sensors/Sensor.hh>
+#include <sdf/sdf.hh>
+#include <sdf/Param.hh>
+#include <gazebo/common/Exception.hh>
+#include <gazebo/sensors/RaySensor.hh>
+#include <gazebo/sensors/SensorTypes.hh>
+#include <gazebo/transport/transport.hh>
+
+#ifdef ENABLE_PROFILER
+#include <ignition/common/Profiler.hh>
+#endif
+
+#include <tf/tf.h>
+#include <tf/transform_listener.h>
+
 #include "multipath_sim/multipath_sensor.hh"
+#include <ignition/math/Rand.hh>
 
-#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <memory>
-#include <stdio.h>
-// #include <common.h>
-
-using namespace gazebo;
-using namespace std;
-
+namespace gazebo
+{
 // Register this plugin with the simulator
-GZ_REGISTER_SENSOR_PLUGIN(MultipathPlugin)
+GZ_REGISTER_SENSOR_PLUGIN(MultipathSimPlugin)
 
-/////////////////////////////////////////////////
-MultipathPlugin::MultipathPlugin()
+////////////////////////////////////////////////////////////////////////////////
+// Constructor
+MultipathSimPlugin::MultipathSimPlugin()
 {
 }
 
-/////////////////////////////////////////////////
-MultipathPlugin::~MultipathPlugin()
+////////////////////////////////////////////////////////////////////////////////
+// Destructor
+MultipathSimPlugin::~MultipathSimPlugin()
 {
-  newLaserScansConnection_->~Connection();
-  newLaserScansConnection_.reset();
-  parentSensor_.reset();
-  world_->Reset();
+  this->rosnode_->shutdown();
+  delete this->rosnode_;
 }
 
-/////////////////////////////////////////////////
-void MultipathPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
+////////////////////////////////////////////////////////////////////////////////
+// Load the controller
+void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 {
-  // // Get then name of the parent sensor
-  // parentSensor_ = std::dynamic_pointer_cast<sensors::RaySensor>(_parent);
+  // load plugin
+  RayPlugin::Load(_parent, this->sdf);
+  // Get the world name.
+  std::string worldName = _parent->WorldName();
+  this->world_ = physics::get_world(worldName);
+  // save pointers
+  this->sdf = _sdf;
 
-  // if (!parentSensor_)
-  //   gzthrow("LidarPlugin requires a Ray Sensor as its parent");
+  GAZEBO_SENSORS_USING_DYNAMIC_POINTER_CAST;
+  this->parent_ray_sensor_ =
+    dynamic_pointer_cast<sensors::RaySensor>(_parent);
 
-  // world_ = physics::get_world(parentSensor_->WorldName());
+  if (!this->parent_ray_sensor_)
+    gzthrow("MultipathSimPlugin controller requires a Ray Sensor as its parent");
 
-  // newLaserScansConnection_ = parentSensor_->LaserShape()->ConnectNewLaserScans(
-  //     boost::bind(&LidarPlugin::OnNewLaserScans, this));
+  this->robot_namespace_ =  GetRobotNamespace(_parent, _sdf, "Laser");
 
-  // if (_sdf->HasElement("robotNamespace"))
-  //   namespace_ = _sdf->GetElement("robotNamespace")->Get<std::string>();
-  // else
-  //   gzwarn << "[gazebo_lidar_plugin] Please specify a robotNamespace.\n";
+  if (!this->sdf->HasElement("frameName"))
+  {
+    ROS_INFO_NAMED("laser", "Laser plugin missing <frameName>, defaults to /world");
+    this->frame_name_ = "/world";
+  }
+  else
+    this->frame_name_ = this->sdf->Get<std::string>("frameName");
 
-  // if (_sdf->HasElement("simulate_fog")) {
-  //   simulate_fog_ = _sdf->GetElement("simulate_fog")->Get<bool>();
-  // } else {
-  //   simulate_fog_ = false;
-  // }
-  // // get minimum distance
-  // if (_sdf->HasElement("min_distance")) {
-  //   min_distance_ = _sdf->GetElement("min_distance")->Get<double>();
-  //   if (min_distance_ < kSensorMinDistance) {
-  //     min_distance_ = kSensorMinDistance;
-  //   }
-  // } else {
-  //   gzwarn << "[gazebo_lidar_plugin] Using default minimum distance: " << kDefaultMinDistance << "\n";
-  //   min_distance_ = kDefaultMinDistance;
-  // }
 
-  // // get maximum distance
-  // if (_sdf->HasElement("max_distance")) {
-  //   max_distance_ = _sdf->GetElement("max_distance")->Get<double>();
-  //   if (max_distance_ > kSensorMaxDistance) {
-  //     max_distance_ = kSensorMaxDistance;
-  //   }
-  // } else {
-  //   gzwarn << "[gazebo_lidar_plugin] Using default maximum distance: " << kDefaultMaxDistance << "\n";
-  //   max_distance_ = kDefaultMaxDistance;
-  // }
+  if (!this->sdf->HasElement("topicName"))
+  {
+    ROS_INFO_NAMED("laser", "Laser plugin missing <topicName>, defaults to /world");
+    this->topic_name_ = "/world";
+  }
+  else
+    this->topic_name_ = this->sdf->Get<std::string>("topicName");
 
-  // // Set high and low signal strength
-  // // The considered relationship of distance to returned signal strength is an
-  // // inverse square.
-  // low_signal_strength_ = sqrt(min_distance_);
-  // high_signal_strength_ = sqrt(max_distance_ + 0.02); // extend the threshold so there is still quality at max distance
+  this->laser_connect_count_ = 0;
 
-  // node_handle_ = transport::NodePtr(new transport::Node());
-  // node_handle_->Init(namespace_);
+    // Make sure the ROS node for Gazebo has already been initialized
+  if (!ros::isInitialized())
+  {
+    ROS_FATAL_STREAM_NAMED("laser", "A ROS node for Gazebo has not been initialized, unable to load plugin. "
+      << "Load the Gazebo system plugin 'libgazebo_ros_api_plugin.so' in the gazebo_ros package)");
+    return;
+  }
 
-  // // Get the root model name
-  // const string scopedName = _parent->ParentName();
-  // vector<string> names_splitted;
-  // boost::split(names_splitted, scopedName, boost::is_any_of("::"));
-  // names_splitted.erase(std::remove_if(begin(names_splitted), end(names_splitted),
-  //                           [](const string& name)
-  //                           { return name.size() == 0; }), end(names_splitted));
-  // std::string rootModelName = names_splitted.front(); // The first element is the name of the root model
+  ROS_INFO_NAMED("laser", "Starting Laser Plugin (ns = %s)", this->robot_namespace_.c_str() );
+  // ros callback queue for processing subscription
+  this->deferred_load_thread_ = boost::thread(
+    boost::bind(&MultipathSimPlugin::LoadThread, this));
 
-  // // the second to the last name is the model name
-  // const std::string parentSensorModelName = names_splitted.rbegin()[1];
-
-  // // get lidar topic name
-  // if(_sdf->HasElement("topic")) {
-  //   lidar_topic_ = parentSensor_->Topic();
-  // } else {
-  //   // if not set by parameter, get the topic name from the model name
-  //   lidar_topic_ = parentSensorModelName;
-  //   gzwarn << "[gazebo_lidar_plugin]: " + names_splitted.front() + "::" + names_splitted.rbegin()[1] +
-  //     " using lidar topic \"" << parentSensorModelName << "\"\n";
-  // }
-
-  // // Calculate parent sensor rotation WRT `base_link`
-  // const ignition::math::Quaterniond q_ls = parentSensor_->Pose().Rot();
-
-  // // Set the orientation
-  // orientation_.set_x(q_ls.X());
-  // orientation_.set_y(q_ls.Y());
-  // orientation_.set_z(q_ls.Z());
-  // orientation_.set_w(q_ls.W());
-
-  // // start lidar topic publishing
-  // lidar_pub_ = node_handle_->Advertise<sensor_msgs::msgs::Range>("~/" + names_splitted[0] + "/link/" + lidar_topic_, 10);
 }
 
-/////////////////////////////////////////////////
-void MultipathPlugin::OnNewLaserScans()
+////////////////////////////////////////////////////////////////////////////////
+// Load the controller
+void MultipathSimPlugin::LoadThread()
 {
-//   // Get the current simulation time.
-// #if GAZEBO_MAJOR_VERSION >= 9
-//   common::Time now = world_->SimTime();
-// #else
-//   common::Time now = world_->GetSimTime();
-// #endif
+  this->gazebo_node_ = gazebo::transport::NodePtr(new gazebo::transport::Node());
+  this->gazebo_node_->Init(this->world_name_);
 
-//   lidar_message_.set_time_usec(now.Double() * 1e6);
-//   lidar_message_.set_min_distance(min_distance_);
-//   lidar_message_.set_max_distance(max_distance_);
+  this->pmq.startServiceThread();
 
-//   // get current distance measured from the sensor
-//   double current_distance = parentSensor_->Range(0);
+  this->rosnode_ = new ros::NodeHandle(this->robot_namespace_);
 
-//   // set distance to min/max if actual value is smaller/bigger
-//   if (simulate_fog_ && current_distance > 2.0f) {
-//     double whiteNoise = ignition::math::Rand::DblNormal(0.0f, 0.1f);
-//     current_distance = 2.0f + whiteNoise;
-//   } else if (current_distance < min_distance_ || std::isinf(current_distance)) {
-//     current_distance = min_distance_;
-//   } else if (current_distance > max_distance_) {
-//     current_distance = max_distance_;
-//   }
+  this->tf_prefix_ = tf::getPrefixParam(*this->rosnode_);
+  ROS_INFO_NAMED("laser", "Laser Plugin (ns = %s)  <tf_prefix_>, set to \"%s\"",
+             this->robot_namespace_.c_str(), this->tf_prefix_.c_str());
 
+  // resolve tf prefix
+  this->frame_name_ = tf::resolve(this->tf_prefix_, this->frame_name_);
 
-//   lidar_message_.set_current_distance(current_distance);
-//   lidar_message_.set_h_fov(kDefaultFOV);
-//   lidar_message_.set_v_fov(kDefaultFOV);
-//   lidar_message_.set_allocated_orientation(new gazebo::msgs::Quaternion(orientation_));
+  if (this->topic_name_ != "")
+  {
+    ros::AdvertiseOptions ao =
+      ros::AdvertiseOptions::create<sensor_msgs::LaserScan>(
+      this->topic_name_, 1,
+      boost::bind(&MultipathSimPlugin::LaserConnect, this),
+      boost::bind(&MultipathSimPlugin::LaserDisconnect, this),
+      ros::VoidPtr(), NULL);
+    this->pub_ = this->rosnode_->advertise(ao);
+    this->pub_queue_ = this->pmq.addPub<sensor_msgs::LaserScan>();
+  }
 
-//   // Compute signal strength
-//   // Other effects like target size, shape or reflectivity are not considered
-//   const double signal_strength = sqrt(current_distance);
+  // Initialize the controller
 
-//   // Compute and set the signal quality
-//   // The signal quality is normalized between 1 and 100 using the absolute
-//   // signal strength (DISTANCE_SENSOR signal_quality value of 0 means invalid)
-//   uint8_t signal_quality = 1;
-//   if (signal_strength > low_signal_strength_) {
-//     signal_quality = static_cast<uint8_t>(99 * ((high_signal_strength_ - signal_strength) /
-//             (high_signal_strength_ - low_signal_strength_)) + 1);
-//   }
+  // sensor generation off by default
+  this->parent_ray_sensor_->SetActive(false);
+}
 
-//   lidar_message_.set_signal_quality(signal_quality);
+////////////////////////////////////////////////////////////////////////////////
+// Increment count
+void MultipathSimPlugin::LaserConnect()
+{
+  this->laser_connect_count_++;
+  if (this->laser_connect_count_ == 1)
+    this->laser_scan_sub_ =
+      this->gazebo_node_->Subscribe(this->parent_ray_sensor_->Topic(),
+                                    &MultipathSimPlugin::OnScan, this);
+}
 
-//   lidar_pub_->Publish(lidar_message_);
+////////////////////////////////////////////////////////////////////////////////
+// Decrement count
+void MultipathSimPlugin::LaserDisconnect()
+{
+  this->laser_connect_count_--;
+  if (this->laser_connect_count_ == 0)
+    this->laser_scan_sub_.reset();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Convert new Gazebo message to ROS message and publish it
+void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
+{
+#ifdef ENABLE_PROFILER
+  IGN_PROFILE("MultipathSimPlugin::OnScan");
+  IGN_PROFILE_BEGIN("fill ROS message");
+#endif
+  // We got a new message from the Gazebo sensor.  Stuff a
+  // corresponding ROS message and publish it.
+  sensor_msgs::LaserScan laser_msg;
+  laser_msg.header.stamp = ros::Time(_msg->time().sec(), _msg->time().nsec());
+  laser_msg.header.frame_id = this->frame_name_;
+  laser_msg.angle_min = _msg->scan().angle_min();
+  laser_msg.angle_max = _msg->scan().angle_max();
+  laser_msg.angle_increment = _msg->scan().angle_step();
+  laser_msg.time_increment = 0;  // instantaneous simulator scan
+  laser_msg.scan_time = 0;  // not sure whether this is correct
+  laser_msg.range_min = _msg->scan().range_min();
+  laser_msg.range_max = _msg->scan().range_max();
+  laser_msg.ranges.resize(_msg->scan().ranges_size());
+  std::copy(_msg->scan().ranges().begin(),
+            _msg->scan().ranges().end(),
+            laser_msg.ranges.begin());
+  laser_msg.intensities.resize(_msg->scan().intensities_size());
+  std::copy(_msg->scan().intensities().begin(),
+            _msg->scan().intensities().end(),
+            laser_msg.intensities.begin());
+  this->pub_queue_->push(laser_msg, this->pub_);
+#ifdef ENABLE_PROFILER
+  IGN_PROFILE_END();
+#endif
+}
 }
