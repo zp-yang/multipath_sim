@@ -105,6 +105,10 @@
               <stddev>0.0</stddev>
             </noise>
           </ray>
+          <plugin name="Multipath Plugin" filename="libMultipathPlugin.so">
+            <topicName>/multipath/scan</topicName>
+            <frameName>laser_0</frameName>
+          </plugin>
         </sensor>
         <self_collide>0</self_collide>
       </link>

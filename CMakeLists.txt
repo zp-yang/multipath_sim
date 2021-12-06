@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  gazebo_ros
 )
 
 find_package(gazebo REQUIRED)
@@ -107,6 +108,7 @@ find_package(gazebo REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES multipath_sim
+ CATKIN_DEPENDS gazebo_ros gazebo_plugins roscpp
 #  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
@@ -133,8 +135,8 @@ list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
 add_library(MultipathPlugin SHARED
   src/multipath_sim/multipath_sensor.cc
 )
-target_link_libraries(MultipathPlugin
-  ${GAZEBO_LIBRARIES}
+target_link_libraries(MultipathPlugin RayPlugin
+  ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} 
 )
 
 ## Add cmake target dependencies of the library
