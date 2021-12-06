@@ -26,7 +26,7 @@
 #include <iostream>
 #include <memory>
 #include <stdio.h>
-#include <common.h>
+// #include <common.h>
 
 using namespace gazebo;
 using namespace std;
@@ -35,7 +35,7 @@ using namespace std;
 GZ_REGISTER_SENSOR_PLUGIN(MultipathPlugin)
 
 /////////////////////////////////////////////////
-MuultipathPlugin::MultipathPlugin()
+MultipathPlugin::MultipathPlugin()
 {
 }
 
@@ -49,7 +49,7 @@ MultipathPlugin::~MultipathPlugin()
 }
 
 /////////////////////////////////////////////////
-void LidarPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
+void MultipathPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 {
   // // Get then name of the parent sensor
   // parentSensor_ = std::dynamic_pointer_cast<sensors::RaySensor>(_parent);
@@ -139,7 +139,7 @@ void LidarPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 }
 
 /////////////////////////////////////////////////
-void LidarPlugin::OnNewLaserScans()
+void MultipathPlugin::OnNewLaserScans()
 {
 //   // Get the current simulation time.
 // #if GAZEBO_MAJOR_VERSION >= 9

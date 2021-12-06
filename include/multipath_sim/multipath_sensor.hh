@@ -12,9 +12,9 @@
 #include <gazebo/sensors/SensorTypes.hh>
 #include <gazebo/sensors/RaySensor.hh>
 
-#include <common.h>
+// #include <common.h>
 
-#include <Range.pb.h>
+// #include <Range.pb.h>
 
 namespace gazebo
 {
@@ -52,7 +52,7 @@ namespace gazebo
     /// \brief The connection tied to LidarPlugin::OnNewLaserScans()
     private:
       event::ConnectionPtr newLaserScansConnection_;
-      sensor_msgs::msgs::Range lidar_message_;
+      // sensor_msgs::msgs::Range lidar_message_;
   };
 }
 #endif

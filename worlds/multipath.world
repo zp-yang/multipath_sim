@@ -34,21 +34,21 @@
     </model>
     <model name="building_1">
       <include>
-        <uri>../models/building</uri>
+        <uri>model://building</uri>
         <pose>25 -30 0 0 0 0</pose>
         <name>building_1</name>
       </include>
     </model>
     <model name="building_2">
       <include>
-        <uri>../models/building</uri>
+        <uri>model://building</uri>
         <pose>5 30 0 0 0 0</pose>
         <name>building_2</name>
       </include>
     </model>
     <model name="building_3">
       <include>
-        <uri>../models/building</uri>
+        <uri>model://building</uri>
         <pose>-25 30 0 0 0 0</pose>
         <name>building_3</name>
       </include>

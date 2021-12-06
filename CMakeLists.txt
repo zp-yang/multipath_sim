@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
 )
 
+find_package(gazebo REQUIRED)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -119,14 +121,21 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}
-  /usr/include/gazebo-9/
-  /usr/include/ignition/
 )
 
-## Declare a C++ library
+# Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/multipath_sim.cpp
+#   src/${PROJECT_NAME}/multipath_sensor.cc
 # )
+link_directories(${GAZEBO_LIBRARY_DIRS})
+list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
+
+add_library(MultipathPlugin SHARED
+  src/multipath_sim/multipath_sensor.cc
+)
+target_link_libraries(MultipathPlugin
+  ${GAZEBO_LIBRARIES}
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -152,15 +161,6 @@ include_directories(
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
-link_directories(${GAZEBO_LIBRARY_DIRS})
-list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
-
-add_library(MultipathPlugin SHARED
-  src/multipath_sim/multipath_sensor.cc
-)
-target_link_libraries(MultipathPlugin
-  ${GAZEBO_LIBRARIES}
-)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
 #############
