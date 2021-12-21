@@ -45,6 +45,8 @@
 #include "multipath_sim/multipath_sensor.hh"
 #include <ignition/math/Rand.hh>
 
+#include <cmath>
+
 namespace gazebo
 {
 // Register this plugin with the simulator
@@ -102,6 +104,15 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   else
     this->topic_name_ = this->sdf->Get<std::string>("topicName");
 
+  if (!this->sdf->HasElement("offsetTopicName"))
+  {
+    ROS_INFO_NAMED("laser", "Laser plugin missing <offsetTopicName>, defaults to /world");
+    this->topic_name_ = "/world";
+  }
+  else
+    this->offset_topic_name_ = this->sdf->Get<std::string>("offsetTopicName");
+
+
   this->laser_connect_count_ = 0;
 
     // Make sure the ROS node for Gazebo has already been initialized
@@ -149,6 +160,18 @@ void MultipathSimPlugin::LoadThread()
     this->pub_queue_ = this->pmq.addPub<sensor_msgs::LaserScan>();
   }
 
+  if (this->offset_topic_name_ != "")
+  {
+    ros::AdvertiseOptions ao =
+      ros::AdvertiseOptions::create<multipath_sim::MultipathOffset>(
+      this->offset_topic_name_, 1,
+      boost::bind(&MultipathSimPlugin::LaserConnect, this),
+      boost::bind(&MultipathSimPlugin::LaserDisconnect, this),
+      ros::VoidPtr(), NULL);
+    this->offset_pub_ = this->rosnode_->advertise(ao);
+    this->offset_pub_queue_ = this->pmq.addPub<multipath_sim::MultipathOffset>();
+  }
+
   // Initialize the controller
 
   // sensor generation off by default
@@ -190,6 +213,71 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   laser_msg.header.frame_id = this->frame_name_;
   laser_msg.angle_min = _msg->scan().angle_min();
   laser_msg.angle_max = _msg->scan().angle_max();
+
+  // gzdbg << "H Min: " << _msg->scan().angle_min() << std::endl;
+  // gzdbg << "H Max: " << _msg->scan().angle_max() << std::endl;
+
+  // gzdbg << "V Max: " << _msg->scan().vertical_angle_max() << std::endl;
+  // gzdbg << "V Min: " << _msg->scan().vertical_angle_min() << std::endl;
+
+  // first half(lower) are the the pseudo reflected rays, the second half (higher) are direct satellite rays.
+  std::vector<float> sat_ray_ranges; 
+  std::vector<float> rfl_ray_ranges;
+  rfl_ray_ranges.resize(_msg->scan().count());
+  std::copy(_msg->scan().ranges().begin(),
+            _msg->scan().ranges().begin()+_msg->scan().count(),
+            rfl_ray_ranges.begin());
+
+  sat_ray_ranges.resize(_msg->scan().count());
+  std::copy(_msg->scan().ranges().begin()+_msg->scan().count(),
+            _msg->scan().ranges().end(),
+            sat_ray_ranges.begin());
+
+  multipath_sim::MultipathOffset offset_msg;
+  offset_msg.header.stamp = ros::Time(_msg->time().sec(), _msg->time().nsec());
+  offset_msg.header.frame_id = this->frame_name_;
+  offset_msg.offset.resize(_msg->scan().count());
+
+  float angle_inc = _msg->scan().angle_step();
+  float angle_vert_min = _msg->scan().vertical_angle_min();
+  float angle_horz_min = _msg->scan().angle_min();
+  float angle_horz_max = _msg->scan().angle_max();
+  int range_size = _msg->scan().ranges_size();
+  int v_count = _msg->scan().vertical_count();
+  int direct_sat_ctr = _msg->scan().count();
+
+  float cur_ang = _msg->scan().angle_min();
+
+  for (int i=0; i < sat_ray_ranges.size(); i++)
+  {
+    float m = 0;
+    if (sat_ray_ranges[i] < _msg->scan().range_max()) // LOS is blocked
+    {
+      gzdbg << "LOS blocked" << std::endl;
+      direct_sat_ctr--; 
+      // check check mirror ray
+      int mir_index = MultipathSimPlugin::mirrorRayIndex(i, _msg->scan().count());
+      float mir_range = rfl_ray_ranges[mir_index];
+      gzdbg << "mir_index: " << mir_index << std::endl;
+      gzdbg << "mir_range: " << mir_range << std::endl;
+
+      if (mir_range < _msg->scan().range_max()) // mirror ray exists
+      {
+        m = mir_range * ( 1 + sin(M_PI/2.0-(_msg->scan().vertical_angle_min()+_msg->scan().vertical_angle_max())));
+        gzdbg << "m: " << m << std::endl;
+      }
+      else // GPS signal completely blocked
+      {
+        m = -1;
+      }
+    }
+    offset_msg.offset[i] = m;
+    cur_ang += _msg->scan().angle_step();
+  }
+
+  // custom multipath offset message
+  this->offset_pub_queue_->push(offset_msg, this->offset_pub_);
+
   laser_msg.angle_increment = _msg->scan().angle_step();
   laser_msg.time_increment = 0;  // instantaneous simulator scan
   laser_msg.scan_time = 0;  // not sure whether this is correct
@@ -208,4 +296,18 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   IGN_PROFILE_END();
 #endif
 }
+
+int MultipathSimPlugin::mirrorRayIndex(int curRay, int count)
+{
+  // return the ray index 180 degrees offset of the current ray
+  if (curRay <= count/2)
+  {
+    return curRay + count/2;
+  }
+  else
+  {
+    return curRay % (count/2);
+  }
+}
+
 }

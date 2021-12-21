@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   gazebo_ros
+  message_generation
 )
 
 find_package(gazebo REQUIRED)
@@ -50,11 +51,10 @@ find_package(gazebo REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  MultipathOffset.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -63,7 +63,7 @@ find_package(gazebo REQUIRED)
 #   Service2.srv
 # )
 
-## Generate actions in the 'action' folder
+## Generate actions in the 'action' folders
 # add_action_files(
 #   FILES
 #   Action1.action
@@ -71,10 +71,10 @@ find_package(gazebo REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -108,8 +108,7 @@ find_package(gazebo REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES multipath_sim
- CATKIN_DEPENDS gazebo_ros gazebo_plugins roscpp
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+ CATKIN_DEPENDS gazebo_ros gazebo_plugins roscpp rospy std_msgs message_runtime
 #  DEPENDS system_lib
 )
 
@@ -132,10 +131,10 @@ include_directories(
 link_directories(${GAZEBO_LIBRARY_DIRS})
 list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
 
-add_library(MultipathPlugin SHARED
+add_library(MultipathSimPlugin SHARED
   src/multipath_sim/multipath_sensor.cc
 )
-target_link_libraries(MultipathPlugin RayPlugin
+target_link_libraries(MultipathSimPlugin RayPlugin
   ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} 
 )
 

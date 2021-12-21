@@ -1,0 +1,36 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="abu_dhabi_model">
+    <pose>0 0 0 0 0 0</pose>
+    <static>true</static>
+    <link name="terrain">
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://abu_dhabi_model/media/terrain.dae</uri></mesh>
+        </geometry>
+        <pose>0 0 -3.5 0 0 0</pose>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://abu_dhabi_model/media/terrain.dae</uri></mesh>
+        </geometry>
+        <pose>0 0 -3.5 0 0 0</pose>
+      </collision>
+    </link>
+
+    <link name="buildings">
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://abu_dhabi_model/media/buildings.dae</uri></mesh>
+        </geometry>
+        <pose>0 0 -3.5 0 0 0</pose>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://abu_dhabi_model/media/buildings.dae</uri></mesh>
+        </geometry>
+        <pose>0 0 -3.5 0 0 0</pose>
+      </collision>
+    </link>
+  </model>
+</sdf>
