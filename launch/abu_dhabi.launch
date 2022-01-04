@@ -10,5 +10,6 @@
     <arg name="server_required" value="true"/>
     <arg name="gui_required" value="true"/>
   </include>
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $find(multipath_sim)/config/multipath_sim.rviz"/>
   <!-- <node pkg="multipath_sim" name="set_model_state" type="set_model_state.py" output="screen"/> -->
 </launch>
