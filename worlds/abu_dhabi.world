@@ -86,18 +86,18 @@
           <visualize>true</visualize>
           <update_rate>20</update_rate>
           <ray>
-            <scan>
+            <scan>/multipath/offset
               <horizontal>
-                <samples>5</samples>
+                <samples>8</samples>
                 <resolution>1</resolution>
                 <min_angle>0</min_angle>
-                <max_angle>6.28</max_angle>
+                <max_angle>5.5</max_angle>
               </horizontal>
               <vertical>
-                <samples>1</samples>
+                <samples>2</samples>
                 <resolution>1</resolution>
-                <min_angle>0.7</min_angle>
-                <max_angle>0.7</max_angle>
+                <min_angle>0.8</min_angle>
+                <max_angle>0.8</max_angle>
               </vertical>
             </scan>
             <range>
@@ -113,57 +113,16 @@
           </ray>
           <plugin name="Multipath Plugin" filename="libMultipathSimPlugin.so">
             <topicName>/multipath/scan</topicName>
+            <offsetTopicName>/multipath/offset</offsetTopicName>
             <frameName>laser_0</frameName>
           </plugin>
         </sensor>
         <self_collide>0</self_collide>
       </link>
+      <plugin name="hb1_virtual_pose" filename="libgazebo_model_pose.so">
+        <topic>/qualisys/hb1/pose</topic>
+      </plugin>
     </model>
-
-    <!-- <model name="lcam_0">
-      <static>true</static>
-      <pose>0 2 1 0 0 -1</pose>
-      <link name="lcam_link">
-        <visual name="lcam_visual">
-          <geometry>
-            <box>
-              <size>0.2 0.1 0.1</size>
-            </box>
-          </geometry>
-        </visual>
-        <collision name='collision'>
-          <laser_retro>0</laser_retro>
-          <max_contacts>10</max_contacts>
-          <pose>0 0 0 0 -0 0</pose>
-          <geometry>
-            <box>
-              <size>0.2 .1 .1</size>
-            </box>
-          </geometry>
-        </collision>
-        <sensor name="logic cam" type="logical_camera">
-          <pose>0.21 0 0 0 0</pose>
-          <logical_camera>
-            <near>0.5</near>
-            <far>100</far>
-            <horizontal_fov>0.01</horizontal_fov>
-            <aspect_ratio>2</aspect_ratio>
-          </logical_camera>
-          <visualize>true</visualize>
-          <always_on>true</always_on>
-          <update_rate>10</update_rate>
-        </sensor>
-      </link>
-    </model> -->
-
-    <!-- <model name="drone_0">
-      <include>
-        <uri>../models/iris_virtual_ray</uri>
-        <pose>0 0 1 0 0 0</pose>
-        <name>drone_0</name>
-      </include>
-    </model> -->
-
 <!-- 
     <gui fullscreen='0'>
       <camera name='user_camera'>

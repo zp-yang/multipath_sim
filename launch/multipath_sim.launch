@@ -1,0 +1,66 @@
+<launch>
+
+    <!-- Live -->
+    <arg name="server" default="192.168.1.2"/>
+    <arg name="rate_limit" default="10"/>
+    <arg name="vehicle" default="hb1"/>
+  
+    <!-- <node pkg="topic_tools" type="relay" name="relay" output="screen" args="/qualisys/$(arg vehicle)/odom /mavros/odometry/out"/> -->
+    <node pkg="topic_tools" type="relay" name="relay" output="screen" args="/multipath/$(arg vehicle)/aff_odom /mavros/odometry/out"/>
+    
+    <node pkg="qualisys" type="node" name="qualisys" output="screen">
+      <param name="server" value="$(arg server)"/>
+      <param name="rate_limit" value="$(arg rate_limit)"/>
+    </node>
+  
+    <arg name="fcu_url" value="udp://0.0.0.0:14018@192.168.123.18:14557"/>
+      <arg name="gcs_url" value="udp://@127.0.0.1"/>
+      <arg name="tgt_system" value="1"/>
+      <arg name="tgt_component" value="1"/>
+    <arg name="pluginlists_yaml" value="$(find qualisys)/launch/px4_pluginlists.yaml" />
+    <arg name="config_yaml" value="$(find qualisys)/launch/px4_config.yaml" />
+      <arg name="log_output" default="screen" />
+      <arg name="fcu_protocol" default="v2.0" />
+      <arg name="respawn_mavros" default="false" />
+  
+      <node pkg="mavros" type="mavros_node" name="mavros" required="$(eval not respawn_mavros)" clear_params="true" output="$(arg log_output)" respawn="$(arg respawn_mavros)">
+          <param name="fcu_url" value="$(arg fcu_url)" />
+          <param name="gcs_url" value="$(arg gcs_url)" />
+          <param name="target_system_id" value="$(arg tgt_system)" />
+          <param name="target_component_id" value="$(arg tgt_component)" />
+          <param name="fcu_protocol" value="$(arg fcu_protocol)" />
+  
+          <!-- load blacklist, config -->
+          <rosparam command="load" file="$(arg pluginlists_yaml)" />
+          <rosparam command="load" file="$(arg config_yaml)" />
+      </node>
+  
+    <node pkg="tf2_ros" type="static_transform_publisher" name="$(arg vehicle)_base_link" args="0 0 0 0 0 0 $(arg vehicle) base_link"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="qualisys_map" args="0 0 0 1.5707 0 0 map qualisys"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="map_odom" args="0 0 0 0 0 0 map odom"/>
+  
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find multipath_sim)/config/qualisys.rviz"/>
+  
+    <!-- <node name="record" pkg="rosbag" type="record" args="record -o $(arg vehicle)_pose /qualisys/$(arg vehicle)/pose"/> -->
+    <node pkg="multipath_sim" name="multipath_error_vis" type="multipath_error_visualize.py" output="screen"/>
+  
+    <!-- Simulation -->
+  
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+      <arg name="use_sim_time" value="false"/>
+      <arg name="gui" value="true"/>
+      <arg name="world_name" value="worlds/abu_dhabi.world"/>
+      <arg name="debug" value="false"/>
+      <arg name="verbose" value="false"/>
+      <arg name="paused" value="false"/>
+      <arg name="respawn_gazebo" value="false"/>
+    </include>
+  
+  
+    <node name="image_view" pkg="rqt_image_view" type="rqt_image_view" args="/iris_virtual/usb_cam/image_raw"/>
+  
+    <!-- <node name="rqt_bag" pkg="rqt_bag" type="rqt_bag" args="$(find qualisys)/data/hb1_pose_2020-09-20-09-14-18.bag"/>-->
+  
+  </launch>
+  <!-- vim: set et fenc=utf-8 ft=xml ff=unix sts=0 sw=2 ts=2 : -->
+  
