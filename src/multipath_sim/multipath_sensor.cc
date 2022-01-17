@@ -317,7 +317,7 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
 int MultipathSimPlugin::mirrorRayIndex(int curRay, int count)
 {
   // return the ray index 180 degrees offset of the current ray
-  if (curRay <= count/2)
+  if (curRay < count/2)
   {
     return curRay + count/2;
   }
