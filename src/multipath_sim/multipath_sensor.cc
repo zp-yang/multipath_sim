@@ -94,8 +94,9 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
     this->frame_name_ = "/world";
   }
   else
+  {
     this->frame_name_ = this->sdf->Get<std::string>("frameName");
-
+  }
 
   if (!this->sdf->HasElement("topicName"))
   {
@@ -103,16 +104,30 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
     this->topic_name_ = "/world";
   }
   else
+  {
     this->topic_name_ = this->sdf->Get<std::string>("topicName");
+  }
 
   if (!this->sdf->HasElement("offsetTopicName"))
   {
-    ROS_INFO_NAMED("laser", "Laser plugin missing <offsetTopicName>, defaults to /world");
+    ROS_INFO_NAMED("multipath", "Multipath plugin missing <offsetTopicName>, defaults to /world");
     this->topic_name_ = "/world";
   }
   else
+  {
     this->offset_topic_name_ = this->sdf->Get<std::string>("offsetTopicName");
+  }
 
+  if (!this->sdf->HasElement("errorScale"))
+  {
+    ROS_INFO_NAMED("multipath", "Multipath plugin mission <errorScale>, defaults to 1");
+    this->error_scale_ = 1.0;
+  }
+  else
+  {
+    this->error_scale_ = this->sdf->Get<float>("errorScale");
+    gzdbg << "error scale: " << this->error_scale_ << "\n";
+  }
 
   this->laser_connect_count_ = 0;
 
@@ -288,13 +303,24 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
     cur_ang += _msg->scan().angle_step();
   }
 
-  offset_msg.offset[0] = error_vec[0];
-  offset_msg.offset[1] = error_vec[1];
-  offset_msg.offset[2] = error_vec[2];
-
+  // no multipath or LOS with 4 direct satellites -- add noise to mocap positions
+  offset_msg.offset[0] = ignition::math::Rand::DblNormal(0.0, 1.0);
+  offset_msg.offset[1] = ignition::math::Rand::DblNormal(0.0, 1.0);
+  offset_msg.offset[2] = ignition::math::Rand::DblNormal(0.0, 1.0);
+  
+  // add multipath error
+  if (direct_sat_ctr < 4)
+  {
+    // averaging from all rays and applying error scaling
+    offset_msg.offset[0] += error_vec[0] / _msg->scan().count() * this->error_scale_;
+    offset_msg.offset[1] += error_vec[1] / _msg->scan().count() * this->error_scale_;
+    offset_msg.offset[2] += error_vec[2] / _msg->scan().count() * this->error_scale_;
+  }
+  
   // custom multipath offset message
   this->offset_pub_queue_->push(offset_msg, this->offset_pub_);
 
+  // laser message
   laser_msg.angle_increment = _msg->scan().angle_step();
   laser_msg.time_increment = 0;  // instantaneous simulator scan
   laser_msg.scan_time = 0;  // not sure whether this is correct

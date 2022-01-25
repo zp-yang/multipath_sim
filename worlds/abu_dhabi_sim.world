@@ -18,40 +18,46 @@
     </scene>
 
     <include>
-      <uri>model://ground_plane</uri>
-    </include>
-
-    <include>
       <uri>model://sun</uri>
     </include>
 
-    <model name="building_0">
-      <include>
-        <uri>../models/building</uri>
-        <pose>-5 -30 0 0 0 0</pose>
-        <name>building_0</name>
-      </include>
-    </model>
-    <model name="building_1">
-      <include>
-        <uri>model://building</uri>
-        <pose>25 -30 0 0 0 0</pose>
-        <name>building_1</name>
-      </include>
-    </model>
-    <model name="building_2">
-      <include>
-        <uri>model://building</uri>
-        <pose>5 30 0 0 0 0</pose>
-        <name>building_2</name>
-      </include>
-    </model>
-    <model name="building_3">
-      <include>
-        <uri>model://building</uri>
-        <pose>-25 30 0 0 0 0</pose>
-        <name>building_3</name>
-      </include>
+    <model name='abu_dhabi'>
+      <pose>-50 -5.5 0 0 0 0.88</pose>
+      <static>1</static>
+      <link name='terrain'>
+        <visual name='visual'>
+          <geometry>
+            <mesh>
+              <uri>model://abu_dhabi/media/terrain.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <mesh>
+              <uri>model://abu_dhabi/media/terrain.dae</uri>
+            </mesh>
+          </geometry>
+        </collision>
+      </link>
+      <link name='buildings'>
+        <visual name='visual'>
+          <geometry>
+            <mesh>
+              <uri>model://abu_dhabi/media/buildings.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        
+        <collision name='collision'>
+          <geometry>
+            <mesh>
+              <uri>model://abu_dhabi/media/buildings.dae</uri>
+            </mesh>
+          </geometry>
+        </collision>
+       
+      </link>
     </model>
 
     <model name="laser_0">
@@ -80,7 +86,7 @@
           <visualize>true</visualize>
           <update_rate>20</update_rate>
           <ray>
-            <scan>
+            <scan>/multipath/offset
               <horizontal>
                 <samples>8</samples>
                 <resolution>1</resolution>
@@ -115,7 +121,6 @@
         <self_collide>0</self_collide>
       </link>
     </model>
-
 <!-- 
     <gui fullscreen='0'>
       <camera name='user_camera'>

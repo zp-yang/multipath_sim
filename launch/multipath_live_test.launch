@@ -41,7 +41,6 @@
   
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find multipath_sim)/config/qualisys.rviz"/>
   
-    <!-- <node name="record" pkg="rosbag" type="record" args="record -o $(arg vehicle)_pose /qualisys/$(arg vehicle)/pose"/> -->
     <node pkg="multipath_sim" name="multipath_error_vis" type="multipath_error_visualize.py" output="screen"/>
   
     <!-- Simulation -->

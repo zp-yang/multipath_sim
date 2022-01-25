@@ -22,7 +22,7 @@
     </include>
 
     <model name='abu_dhabi'>
-      <pose>-50 -1.5 0 0 0 0.88</pose>
+      <pose>-50 -5.5 0 0 0 0.88</pose>
       <static>1</static>
       <link name='terrain'>
         <visual name='visual'>
@@ -115,6 +115,7 @@
             <topicName>/multipath/scan</topicName>
             <offsetTopicName>/multipath/offset</offsetTopicName>
             <frameName>laser_0</frameName>
+            <errorScale>1</errorScale>
           </plugin>
         </sensor>
         <self_collide>0</self_collide>
