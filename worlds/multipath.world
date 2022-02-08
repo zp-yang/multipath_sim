@@ -75,7 +75,7 @@
             </box>
           </geometry>
         </collision>
-        <sensor name="laser" type="ray">
+        <sensor name="laser" type="gpu_ray">
           <pose>0 0 0.1 0 0 0</pose>
           <visualize>true</visualize>
           <update_rate>20</update_rate>

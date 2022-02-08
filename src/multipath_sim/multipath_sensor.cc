@@ -31,7 +31,7 @@
 #include <sdf/sdf.hh>
 #include <sdf/Param.hh>
 #include <gazebo/common/Exception.hh>
-#include <gazebo/sensors/RaySensor.hh>
+#include <gazebo/sensors/GpuRaySensor.hh>
 #include <gazebo/sensors/SensorTypes.hh>
 #include <gazebo/transport/transport.hh>
 
@@ -72,7 +72,7 @@ MultipathSimPlugin::~MultipathSimPlugin()
 void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 {
   // load plugin
-  RayPlugin::Load(_parent, this->sdf);
+  GpuRayPlugin::Load(_parent, this->sdf);
   // Get the world name.
   std::string worldName = _parent->WorldName();
   this->world_ = physics::get_world(worldName);
@@ -81,7 +81,7 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 
   GAZEBO_SENSORS_USING_DYNAMIC_POINTER_CAST;
   this->parent_ray_sensor_ =
-    dynamic_pointer_cast<sensors::RaySensor>(_parent);
+    dynamic_pointer_cast<sensors::GpuRaySensor>(_parent);
 
   if (!this->parent_ray_sensor_)
     gzthrow("MultipathSimPlugin controller requires a Ray Sensor as its parent");
@@ -192,6 +192,11 @@ void MultipathSimPlugin::LoadThread()
 
   // sensor generation off by default
   this->parent_ray_sensor_->SetActive(false);
+  // Setting the maximun and minimum horizontal and vertical angle.
+  this->parent_ray_sensor_->SetAngleMax(0);
+  this->parent_ray_sensor_->SetAngleMin(5.5);
+  this->parent_ray_sensor_->SetVerticalAngleMax(0.8);
+  this->parent_ray_sensor_->SetVerticalAngleMin(0.8);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -230,11 +235,11 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   laser_msg.angle_min = _msg->scan().angle_min();
   laser_msg.angle_max = _msg->scan().angle_max();
 
-  // gzdbg << "H Min: " << _msg->scan().angle_min() << std::endl;
-  // gzdbg << "H Max: " << _msg->scan().angle_max() << std::endl;
+  gzdbg << "H Min: " << _msg->scan().angle_min() << std::endl;
+  gzdbg << "H Max: " << _msg->scan().angle_max() << std::endl;
 
-  // gzdbg << "V Max: " << _msg->scan().vertical_angle_max() << std::endl;
-  // gzdbg << "V Min: " << _msg->scan().vertical_angle_min() << std::endl;
+  gzdbg << "V Max: " << _msg->scan().vertical_angle_max() << std::endl;
+  gzdbg << "V Min: " << _msg->scan().vertical_angle_min() << std::endl;
 
   // first half(lower) are the the pseudo reflected rays, the second half (higher) are direct satellite rays.
   std::vector<float> sat_ray_ranges; 

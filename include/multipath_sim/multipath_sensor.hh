@@ -35,7 +35,7 @@
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/common/Events.hh>
 #include <gazebo/sensors/SensorTypes.hh>
-#include <gazebo/plugins/RayPlugin.hh>
+#include <gazebo/plugins/GpuRayPlugin.hh>
 #include <gazebo_plugins/gazebo_ros_utils.h>
 #include <gazebo_plugins/PubQueue.h>
 
@@ -45,7 +45,7 @@
 
 namespace gazebo
 {
-  class MultipathSimPlugin : public RayPlugin
+  class MultipathSimPlugin : public GpuRayPlugin
   {
     /// \brief Constructor
     public: MultipathSimPlugin();
@@ -67,7 +67,7 @@ namespace gazebo
     private: std::string world_name_;
     private: physics::WorldPtr world_;
     /// \brief The parent sensor
-    private: sensors::RaySensorPtr parent_ray_sensor_;
+    private: sensors::GpuRaySensorPtr parent_ray_sensor_;
 
     /// \brief pointer to ros node
     private: ros::NodeHandle* rosnode_;
