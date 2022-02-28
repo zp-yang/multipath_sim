@@ -8,7 +8,7 @@ cd catkin_ws/src
 git clone git@github.com:zp-yang/multipath_sim
 cd ../
 catkin init
-caktin build
+catkin build
 . devel/setup.bash
 roslaunch multipath_sim test.launch
 ```
