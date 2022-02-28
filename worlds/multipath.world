@@ -82,13 +82,13 @@
           <ray>
             <scan>
               <horizontal>
-                <samples>8</samples>
+                <samples>16</samples>
                 <resolution>1</resolution>
                 <min_angle>0</min_angle>
-                <max_angle>5.5</max_angle>
+                <max_angle>0</max_angle>
               </horizontal>
               <vertical>
-                <samples>2</samples>
+                <samples>1</samples>
                 <resolution>1</resolution>
                 <min_angle>0.8</min_angle>
                 <max_angle>0.8</max_angle>

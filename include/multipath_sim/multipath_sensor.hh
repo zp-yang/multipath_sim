@@ -105,7 +105,7 @@ namespace gazebo
     private: PubMultiQueue pmq;
 
     /// return the mirror ray index of the current ray
-    private: int mirrorRayIndex(int curRay, int range_size);
+    private: int setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<float> pitchAngles , std::vector<float> yawAngles);
   };
 }
 #endif
