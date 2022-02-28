@@ -31,7 +31,7 @@
 #include <sdf/sdf.hh>
 #include <sdf/Param.hh>
 #include <gazebo/common/Exception.hh>
-#include <gazebo/sensors/GpuRaySensor.hh>
+#include <gazebo/sensors/RaySensor.hh>
 #include <gazebo/sensors/SensorTypes.hh>
 #include <gazebo/transport/transport.hh>
 
@@ -72,7 +72,7 @@ MultipathSimPlugin::~MultipathSimPlugin()
 void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 {
   // load plugin
-  GpuRayPlugin::Load(_parent, this->sdf);
+  RayPlugin::Load(_parent, this->sdf);
   // Get the world name.
   std::string worldName = _parent->WorldName();
   this->world_ = physics::get_world(worldName);
@@ -81,7 +81,7 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 
   GAZEBO_SENSORS_USING_DYNAMIC_POINTER_CAST;
   this->parent_ray_sensor_ =
-    dynamic_pointer_cast<sensors::GpuRaySensor>(_parent);
+    dynamic_pointer_cast<sensors::RaySensor>(_parent);
 
   if (!this->parent_ray_sensor_)
     gzthrow("MultipathSimPlugin controller requires a Ray Sensor as its parent");
@@ -192,11 +192,6 @@ void MultipathSimPlugin::LoadThread()
 
   // sensor generation off by default
   this->parent_ray_sensor_->SetActive(false);
-  // Setting the maximun and minimum horizontal and vertical angle.
-  this->parent_ray_sensor_->SetAngleMax(0);
-  this->parent_ray_sensor_->SetAngleMin(5.5);
-  this->parent_ray_sensor_->SetVerticalAngleMax(0.8);
-  this->parent_ray_sensor_->SetVerticalAngleMin(0.8);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -234,92 +229,71 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   laser_msg.header.frame_id = this->frame_name_;
   laser_msg.angle_min = _msg->scan().angle_min();
   laser_msg.angle_max = _msg->scan().angle_max();
-
-  gzdbg << "H Min: " << _msg->scan().angle_min() << std::endl;
-  gzdbg << "H Max: " << _msg->scan().angle_max() << std::endl;
-
-  gzdbg << "V Max: " << _msg->scan().vertical_angle_max() << std::endl;
-  gzdbg << "V Min: " << _msg->scan().vertical_angle_min() << std::endl;
-
-  // first half(lower) are the the pseudo reflected rays, the second half (higher) are direct satellite rays.
-  std::vector<float> sat_ray_ranges; 
-  std::vector<float> rfl_ray_ranges;
-  rfl_ray_ranges.resize(_msg->scan().count());
+  //TODO Add ray angles from configuration file
+  //Consecutive Pairs(i and i+1) represents ray angles of satellite ray and the reflected ray. 
+  std::vector<float> pitch_angles(16,0), yaw_angles(16,0);
+  for (int i = 0 ; i < 16; i=i+2)
+  {
+    //Sattelite Ray Angles 
+    pitch_angles[i] = M_PI / 3;
+    yaw_angles[i] = M_PI * i / 8;
+    //Reflected Ray Angles 
+    pitch_angles[i+1] = M_PI / 3;
+    yaw_angles[i+1] = M_PI * i / 8 + M_PI;
+  }
+  //Updating the ray angles for sateliite and reflected ray.
+  setRayAngles(this->parent_ray_sensor_->LaserShape(), pitch_angles, yaw_angles);
+  //Ray_ranges stores the ranges of both satellite and reflected rays.
+  std::vector<float> ray_ranges; 
+  ray_ranges.resize(_msg->scan().count());
   std::copy(_msg->scan().ranges().begin(),
-            _msg->scan().ranges().begin()+_msg->scan().count(),
-            rfl_ray_ranges.begin());
-
-  sat_ray_ranges.resize(_msg->scan().count());
-  std::copy(_msg->scan().ranges().begin()+_msg->scan().count(),
             _msg->scan().ranges().end(),
-            sat_ray_ranges.begin());
+            ray_ranges.begin());
 
   multipath_sim::MultipathOffset offset_msg;
   offset_msg.header.stamp = ros::Time(_msg->time().sec(), _msg->time().nsec());
   offset_msg.header.frame_id = this->frame_name_;
   offset_msg.offset.resize(3);
-  
-  float angle_inc = _msg->scan().angle_step();
-  float angle_vert_min = _msg->scan().vertical_angle_min();
-  float angle_horz_min = _msg->scan().angle_min();
-  float angle_horz_max = _msg->scan().angle_max();
-  int range_size = _msg->scan().ranges_size();
-  int v_count = _msg->scan().vertical_count();
-  int direct_sat_ctr = _msg->scan().count();
+  //Counter for number of satellite rays with LOS 
+  int sat_ray_with_los = _msg->scan().count()/2;
 
-  float cur_ang = _msg->scan().angle_min();
-
-  ignition::math::Vector3<float> dir_vec{cos(angle_horz_min), sin(angle_horz_min), 0};
+  ignition::math::Vector3<float> dir_vec;
   ignition::math::Vector3<float> error_vec;
-
-  // gzdbg << "Initial dir_vec0: " << dir_vec[0] << "\n";
-  // gzdbg << "Initial dir_vec1: " << dir_vec[1] << "\n";
-  // gzdbg << "Initial dir_vec2: " << dir_vec[2] << "\n";
-  ignition::math::Matrix3<float> rot_mat;
-  rot_mat(0,0) = cos(angle_inc);
-  rot_mat(0,1) = sin(angle_inc);
-  rot_mat(1,0) = -sin(angle_inc);
-  rot_mat(1,1) = cos(angle_inc);
-  for (int i=0; i < sat_ray_ranges.size(); i++)
+  for (int i=0; i < ray_ranges.size(); i=i+2)
   {
-    float m = 0;
-    if (sat_ray_ranges[i] < _msg->scan().range_max()) // LOS is blocked
+    float multipath_dist_increase = 0;
+    dir_vec = {cos(yaw_angles[i]), sin(yaw_angles[i]), 0};
+    //gzdbg << ray_ranges[i] << ray_ranges[i+1] << std::endl;
+    // Check the LOS for sateliite ray
+    if (ray_ranges[i] < _msg->scan().range_max()) 
     {
-      gzdbg << "LOS blocked" << std::endl;
-      direct_sat_ctr--;
-      // check check mirror ray
-      int mir_index = MultipathSimPlugin::mirrorRayIndex(i, _msg->scan().count());
-      float mir_range = rfl_ray_ranges[mir_index];
-      // gzdbg << "mir_index: " << mir_index << std::endl;
-      // gzdbg << "mir_range: " << mir_range << std::endl;
-      gzdbg << "\ni: " << i << "\n";
-      if (mir_range < _msg->scan().range_max()) // mirror ray exists
+      //gzdbg << "LOS blocked" << std::endl;
+      //Decrement the counter of the satellite ray with LOS.
+      sat_ray_with_los--;
+      //Check range of the mirror ray corresponding to the satellite ray 
+      float mir_ray_range = ray_ranges[i+1];
+      if (mir_ray_range < _msg->scan().range_max()) // mirror ray exists
       {
-        m = mir_range * ( 1 + sin(M_PI/2.0-(_msg->scan().vertical_angle_min()+_msg->scan().vertical_angle_max())));
-        error_vec += dir_vec * m;
-        gzdbg << "m: " << m << std::endl;
-      }
-      else // GPS signal completely blocked
-      {
-        m = -1;
+        //Update the error vector to find the increase in the multipath distance 
+        multipath_dist_increase = mir_ray_range * ( 1 + sin(M_PI/2.0 - (pitch_angles[i]+pitch_angles[i+1])));
+        error_vec += dir_vec * multipath_dist_increase;
+        gzdbg << "ray index: " << i << " yaw angle:"<< yaw_angles[i] * 180.0/ M_PI<< " distance increase:"<<multipath_dist_increase 
+                  << " mirror_ray range:"<< mir_ray_range << std::endl;
       }
     }
-    dir_vec = rot_mat * dir_vec;
-    cur_ang += _msg->scan().angle_step();
   }
-
   // no multipath or LOS with 4 direct satellites -- add noise to mocap positions
   offset_msg.offset[0] = ignition::math::Rand::DblNormal(0.0, 1.0);
   offset_msg.offset[1] = ignition::math::Rand::DblNormal(0.0, 1.0);
   offset_msg.offset[2] = ignition::math::Rand::DblNormal(0.0, 1.0);
   
-  // add multipath error
-  if (direct_sat_ctr < 4)
+  // Adding multipath error when the satellite rays are less than 4
+  if (sat_ray_with_los < 4)
   {
     // averaging from all rays and applying error scaling
-    offset_msg.offset[0] += error_vec[0] / _msg->scan().count() * this->error_scale_;
-    offset_msg.offset[1] += error_vec[1] / _msg->scan().count() * this->error_scale_;
-    offset_msg.offset[2] += error_vec[2] / _msg->scan().count() * this->error_scale_;
+    offset_msg.offset[0] += error_vec[0] / (_msg->scan().count()/2) * this->error_scale_;
+    offset_msg.offset[1] += error_vec[1] / (_msg->scan().count()/2) * this->error_scale_;
+    offset_msg.offset[2] += error_vec[2] / (_msg->scan().count()/2) * this->error_scale_;
   }
   
   // custom multipath offset message
@@ -345,17 +319,23 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
 #endif
 }
 
-int MultipathSimPlugin::mirrorRayIndex(int curRay, int count)
-{
-  // return the ray index 180 degrees offset of the current ray
-  if (curRay < count/2)
+int MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<float> pitchAngles , std::vector<float> yawAngles)
+{ 
+  ignition::math::Vector3d start, end, axis;
+  ignition::math::Quaterniond ray;
+  for(unsigned int l=0; l < pitchAngles.size(); l++ ) 
   {
-    return curRay + count/2;
+    double yawAngle = yawAngles[l];
+    double pitchAngle = pitchAngles[l];
+    // since we're rotating a unit x vector, a pitch rotation will now be
+    // around the negative y axis
+    ray.Euler(ignition::math::Vector3d(0.0, -pitchAngle, yawAngle));
+    axis = this->parent_ray_sensor_->Pose().Rot() * ray * ignition::math::Vector3d::UnitX;
+    start = (axis * LaserShape->GetMinRange()) + this->parent_ray_sensor_->Pose().Pos();
+    end = (axis * LaserShape->GetMaxRange()) + this->parent_ray_sensor_->Pose().Pos();
+    LaserShape->SetRay(l, start, end);
   }
-  else
-  {
-    return curRay % (count/2);
-  }
+  return 0;
 }
 
 }

@@ -134,7 +134,7 @@ list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
 add_library(MultipathSimPlugin SHARED
   src/multipath_sim/multipath_sensor.cc
 )
-target_link_libraries(MultipathSimPlugin GpuRayPlugin
+target_link_libraries(MultipathSimPlugin RayPlugin
   ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} 
 )
 
