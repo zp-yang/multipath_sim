@@ -131,11 +131,12 @@ include_directories(
 link_directories(${GAZEBO_LIBRARY_DIRS})
 list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
 
-add_library(MultipathSimPlugin SHARED
+add_library(MultipathSensorPlugin SHARED
   src/multipath_sim/multipath_sensor.cc
 )
-target_link_libraries(MultipathSimPlugin RayPlugin
-  ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} 
+
+target_link_libraries(MultipathSensorPlugin
+  RayPlugin ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} 
 )
 
 ## Add cmake target dependencies of the library

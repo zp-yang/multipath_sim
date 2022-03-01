@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from turtle import begin_fill
 import numpy as np
 from numpy.core.arrayprint import printoptions
 from numpy.linalg import pinv
@@ -14,7 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tf.transformations import quaternion_from_euler
 
-def target_traj_circle(t, begin, end, duration):
+def target_traj_circle(t, *args):
+    begin = args[0]
     theta = 2 * np.pi * 0.1 * t / 3 + np.arctan2(begin[1],begin[0])
     x = 19*np.sin(theta)
     y = 14*np.cos(theta)
@@ -24,8 +26,23 @@ def target_traj_circle(t, begin, end, duration):
     # return pos
     return np.array([x,y,z, 0, 0, yaw])
 
-def target_traj_straight(t, begin, end, duration):
+def target_traj_stationary(t, *args):
+    begin = args[0]
+    return np.concatenate([begin, [0,0,0]])
+
+def targeet_traj_rotate(t, *args):
+    begin = args[0]
+    theta = 2 * np.pi * 0.1 * t / 3 + np.arctan2(begin[1],begin[0])
+    yaw = -(theta + np.pi/2)
+    return np.concatenate([begin, [0,0,yaw]])
+
+def target_traj_straight(t, *args):
+    begin = args[0]
+    end = args[1]
+    duration = args[2]
     trip = int(t / duration)
+
+    print("args:", begin, end, duration)
 
     if (trip % 2): # odd trip
         temp = begin
@@ -34,8 +51,9 @@ def target_traj_straight(t, begin, end, duration):
 
     max_dist = np.linalg.norm(begin-end)
     v_max = (end-begin) / duration
+    print(v_max)
     pos = begin + v_max * (t - trip*duration)
-
+    print(pos)
     att = np.array([0,0,0])
     # return pos
     return np.concatenate([pos, att])
@@ -44,9 +62,11 @@ def set_drone_state(*args):
     args = args[0]
     model_name = args[0]
     traj_fn = args[1]
-    begin = args[2]
-    end = args[3]
-    duration = args[4]
+    traj_fn_args = args[2]
+    print(traj_fn_args)
+    begin = traj_fn_args[0]
+    # end = args[3]
+    # duration = args[4]
     
     br = tf2_ros.TransformBroadcaster()
     state_msg_0 = ModelState()
@@ -70,7 +90,7 @@ def set_drone_state(*args):
         elapsed = (now - start).to_sec()
         rospy.wait_for_service('/gazebo/set_model_state')
         try:
-            pose = traj_fn(elapsed, begin, end, duration)
+            pose = traj_fn(elapsed, *traj_fn_args)
             # print(elapsed, pos)
             state_msg_0.pose.position.x = pose[0]
             state_msg_0.pose.position.y = pose[1]
@@ -108,9 +128,11 @@ def main():
     x0_2 = np.array([20, 5, 20])
 
     executor_args = [
-        ["laser_0", target_traj_straight, x0_1, x0_1+[60,0,0], 30], 
-        # ["drone_1", target_traj_straight, x0_2, x0_2+[-40,0,0], 30],
-        # ["drone_0", target_traj_circle, [-10, 0, 18], [-10, 0, 18], 30],
+        # ["laser_0", target_traj_straight, [x0_1, x0_1+[60,0,0], 30]],
+        # ["laser_0", target_traj_stationary, [x0_1]],
+        ["laser_0", targeet_traj_rotate, [[0,0,0]]],
+        # ["drone_1", target_traj_straight, [x0_2, x0_2+[-40,0,0], 30]],
+        # ["drone_0", target_traj_circle, [[-10, 0, 18], [-10, 0, 18], 30]],
     ]
     
     with ThreadPoolExecutor(max_workers=5) as tpe:

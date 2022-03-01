@@ -39,6 +39,8 @@
 #include <gazebo_plugins/gazebo_ros_utils.h>
 #include <gazebo_plugins/PubQueue.h>
 
+#include <visualization_msgs/Marker.h>
+
 // custom message
 #include <multipath_sim/MultipathOffset.h>
 
@@ -70,17 +72,19 @@ namespace gazebo
     /// \brief The parent sensor
     private: sensors::RaySensorPtr parent_ray_sensor_;
 
-
     /// \brief pointer to ros node
     private: ros::NodeHandle* rosnode_;
     private: ros::Publisher pub_;
     private: PubQueue<sensor_msgs::LaserScan>::Ptr pub_queue_;
     private: ros::Publisher offset_pub_;
     private: PubQueue<multipath_sim::MultipathOffset>::Ptr offset_pub_queue_;
+    private: ros::Publisher sat_ray_pub_;
+    private: PubQueue<visualization_msgs::Marker>::Ptr sat_ray_pub_queue_;
 
     /// \brief topic name
     private: std::string topic_name_;
     private: std::string offset_topic_name_;
+    private: std::string sat_ray_topic_name_;
 
     /// \brief frame transform name, should match link name
     private: std::string frame_name_;
@@ -115,7 +119,7 @@ namespace gazebo
     private: PubMultiQueue pmq;
 
     /// return the mirror ray index of the current ray
-    private: int setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth);
+    private: void setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth);
   };
 }
 #endif

@@ -7,6 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
         - /TF1/Frames1
+        - /SatRay1
       Splitter Ratio: 0.5
     Tree Height: 549
   - Class: rviz/Selection
@@ -78,6 +79,14 @@ Visualization Manager:
             {}
       Update Interval: 0
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /multipath/sat_ray
+      Name: SatRay
+      Namespaces:
+        lines: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -106,7 +115,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 42.77423095703125
+      Distance: 0.9239794015884399
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -114,17 +123,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 0.2454024702310562
+        Y: 0.0288027785718441
+        Z: 0.22799861431121826
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8247971534729004
+      Pitch: 0.3497976064682007
       Target Frame: <Fixed Frame>
-      Yaw: 3.313572883605957
+      Yaw: 5.453621864318848
     Saved: ~
 Window Geometry:
   Displays:
@@ -143,4 +152,4 @@ Window Geometry:
     collapsed: false
   Width: 1267
   X: 660
-  Y: 219
+  Y: 182

@@ -101,7 +101,7 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   if (!this->sdf->HasElement("topicName"))
   {
     ROS_INFO_NAMED("laser", "Laser plugin missing <topicName>, defaults to /world");
-    this->topic_name_ = "/world";
+    this->topic_name_ = "/world/scan";
   }
   else
   {
@@ -111,11 +111,21 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   if (!this->sdf->HasElement("offsetTopicName"))
   {
     ROS_INFO_NAMED("multipath", "Multipath plugin missing <offsetTopicName>, defaults to /world");
-    this->topic_name_ = "/world";
+    this->offset_topic_name_ = "/world/offset";
   }
   else
   {
     this->offset_topic_name_ = this->sdf->Get<std::string>("offsetTopicName");
+  }
+
+  if (!this->sdf->HasElement("satRayTopicName"))
+  {
+    ROS_INFO_NAMED("laser", "Laser plugin missing <satRayTopicName>, defaults to /world");
+    this->sat_ray_topic_name_ = "/world/sat_ray";
+  }
+  else
+  {
+    this->sat_ray_topic_name_ = this->sdf->Get<std::string>("satRayTopicName");
   }
 
   if (!this->sdf->HasElement("errorScale"))
@@ -163,8 +173,6 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
     for (int i = 0; i < this->num_sat_; i++) {
       double sat_az_i;
       ss >> sat_az_i;
-      gzdbg << "azimuth " << i << ": " << sat_az_i << std::endl;
-
       // direct and reflection as an adjacent pair in the vector
       this->sat_dir_azimuth_[i*2] = sat_az_i;
       this->sat_dir_azimuth_[i*2+1] = sat_az_i + M_PI; // assume reflection is 180 deg azimuth from the direct ray
@@ -182,17 +190,14 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
     for (int i = 0; i < this->num_sat_; i++) {
       double sat_el_i;
       ss >> sat_el_i;
-      gzdbg << "elevation "<< i << ": "<< sat_el_i << std::endl;
-
       this->sat_dir_elevation_[i*2] = sat_el_i;
       this->sat_dir_elevation_[i*2+1] = sat_el_i; // assume reflection has the same elevation as the direct ray
     }
   }
 
   std::string parent_entity_name = this->parent_ray_sensor_->ParentName();
-  gzdbg << "parent model: " << parent_entity_name << std::endl;
+  ROS_INFO_NAMED("multipath",  "parent model: %s", parent_entity_name.c_str());
   this->parent_entity_ = this->world->EntityByName(parent_entity_name);
-  gzdbg << this->parent_entity_->WorldPose().Yaw() << std::endl;
 
   this->laser_connect_count_ = 0;
 
@@ -253,6 +258,17 @@ void MultipathSimPlugin::LoadThread()
     this->offset_pub_queue_ = this->pmq.addPub<multipath_sim::MultipathOffset>();
   }
 
+  if (this->sat_ray_topic_name_ != "")
+  { 
+    ros::AdvertiseOptions ao =
+      ros::AdvertiseOptions::create<visualization_msgs::Marker>(
+      this->sat_ray_topic_name_, 1,
+      boost::bind(&MultipathSimPlugin::LaserConnect, this),
+      boost::bind(&MultipathSimPlugin::LaserDisconnect, this),
+      ros::VoidPtr(), NULL);
+    this->sat_ray_pub_ = this->rosnode_->advertise(ao);
+    this->sat_ray_pub_queue_ = this->pmq.addPub<visualization_msgs::Marker>();
+  }
   // Initialize the controller
 
   // sensor generation off by default
@@ -298,7 +314,7 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   //Updating the ray angles for sateliite and reflected ray.
   setRayAngles(this->parent_ray_sensor_->LaserShape(), this->sat_dir_elevation_, this->sat_dir_azimuth_);
   //Ray_ranges stores the ranges of both satellite and reflected rays.
-  std::vector<float> ray_ranges; 
+  std::vector<double> ray_ranges; 
   ray_ranges.resize(_msg->scan().count());
   std::copy(_msg->scan().ranges().begin(),
             _msg->scan().ranges().end(),
@@ -311,28 +327,25 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   //Counter for number of satellite rays with LOS 
   int sat_ray_with_los = this->num_sat_;
 
-  ignition::math::Vector3<float> dir_vec;
-  ignition::math::Vector3<float> error_vec;
+  ignition::math::Vector3<double> dir_vec;
+  ignition::math::Vector3<double> error_vec;
   for (int i=0; i < ray_ranges.size(); i=i+2)
   {
-    float multipath_dist_increase = 0;
+    double multipath_dist_increase = 0;
     dir_vec = {cos(this->sat_dir_azimuth_[i]), sin(this->sat_dir_azimuth_[i]), 0};
-    //gzdbg << ray_ranges[i] << ray_ranges[i+1] << std::endl;
+
     // Check the LOS for sateliite ray
     if (ray_ranges[i] < _msg->scan().range_max()) 
     {
-      //gzdbg << "LOS blocked" << std::endl;
       //Decrement the counter of the satellite ray with LOS.
       sat_ray_with_los--;
       //Check range of the mirror ray corresponding to the satellite ray 
-      float mir_ray_range = ray_ranges[i+1];
+      double mir_ray_range = ray_ranges[i+1];
       if (mir_ray_range < _msg->scan().range_max()) // mirror ray exists
       {
         //Update the error vector to find the increase in the multipath distance 
         multipath_dist_increase = mir_ray_range * ( 1 + sin(M_PI/2.0 - (this->sat_dir_elevation_[i]+this->sat_dir_elevation_[i+1])));
         error_vec += dir_vec * multipath_dist_increase;
-        // gzdbg << "ray index: " << i << " yaw angle:"<< this->sat_dir_azimuth_[i] * 180.0/ M_PI<< " distance increase:"<<multipath_dist_increase 
-        //           << " mirror_ray range:"<< mir_ray_range << std::endl;
       }
     }
   }
@@ -381,25 +394,47 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
 #endif
 }
 
-int MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth)
+void MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth)
 { 
   ignition::math::Vector3d start, end, axis;
   ignition::math::Quaterniond ray;
+  visualization_msgs::Marker line_list;
+  line_list.header.frame_id = this->frame_name_;
+  line_list.header.stamp = ros::Time::now();
+  line_list.ns = "lines";
+  line_list.action = visualization_msgs::Marker::ADD;
+  line_list.pose.orientation.w = 1;
+  line_list.type = visualization_msgs::Marker::LINE_LIST;
+  line_list.scale.x = 0.05;
+  line_list.color.r = 1.0;
+  line_list.color.a = 1.0;
+  
+
   for(unsigned int l=0; l < elevation.size(); l++ ) 
   {
     double yawAngle = azimuth[l];
     double pitchAngle = elevation[l];
     // since we're rotating a unit x vector, a pitch rotation will now be
     // around the negative y axis
-    
     ray.Euler(ignition::math::Vector3d(0.0, -pitchAngle, yawAngle));
     axis = this->parent_entity_->WorldPose().Rot().Inverse() * this->parent_ray_sensor_->Pose().Rot() * ray * ignition::math::Vector3d::UnitX;
-    gzdbg << "axis_" << l << ": " << axis[0] << " " << axis[1] << " " << axis[2] << "\n"; 
     start = (axis * LaserShape->GetMinRange()) + this->parent_ray_sensor_->Pose().Pos();
     end = (axis * LaserShape->GetMaxRange()) + this->parent_ray_sensor_->Pose().Pos();
     LaserShape->SetRay(l, start, end);
+    if (!(l%2))
+    {
+      geometry_msgs::Point p;
+      p.x = start.X();
+      p.y = start.Y();
+      p.z = start.Z();
+      line_list.points.push_back(p);
+      p.x = end.X();
+      p.y = end.Y();
+      p.z = end.Z();
+      line_list.points.push_back(p);
+    }
   }
-  return 0;
+  this->sat_ray_pub_queue_->push(line_list, this->sat_ray_pub_);
 }
 
 }

@@ -82,7 +82,7 @@
           <ray>
             <scan>
               <horizontal>
-                <samples>8</samples>
+                <samples>16</samples>
                 <resolution>1</resolution>
                 <min_angle>0</min_angle>
                 <max_angle>0</max_angle>
@@ -99,15 +99,16 @@
               <stddev>0.0</stddev>
             </noise>
           </ray>
-          <plugin name="Multipath Plugin" filename="libMultipathSimPlugin.so">
+          <plugin name="Multipath Plugin" filename="libMultipathSensorPlugin.so">
             <topicName>/multipath/scan</topicName>
             <offsetTopicName>/multipath/offset</offsetTopicName>
+            <satRayTopicName>/multipath/sat_ray</satRayTopicName>
             <frameName>laser_0</frameName>
             <errorScale>1</errorScale>
             <disableNoise>1</disableNoise>
             <satNum>8</satNum>
-            <satAzimuth>0 0.5 1 1.57 -1.57 -1 -0.5 3.14</satAzimuth>
-            <satElevation>0.8 0.8 0.8 0.8 0.8 0.8 0.8 0.8</satElevation>
+            <satAzimuth>0 0.2 0.5 1.57 -1.57 -1 -0.2 3.14</satAzimuth>
+            <satElevation>0.8 0.8 0.8 0.2 0.8 0.8 0.8 0.8</satElevation>
           </plugin>
         </sensor>
         <self_collide>0</self_collide>
