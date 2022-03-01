@@ -120,14 +120,79 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 
   if (!this->sdf->HasElement("errorScale"))
   {
-    ROS_INFO_NAMED("multipath", "Multipath plugin mission <errorScale>, defaults to 1");
+    ROS_INFO_NAMED("multipath", "Multipath plugin missing <errorScale>, defaults to 1");
     this->error_scale_ = 1.0;
   }
   else
   {
-    this->error_scale_ = this->sdf->Get<float>("errorScale");
-    gzdbg << "error scale: " << this->error_scale_ << "\n";
+    this->error_scale_ = this->sdf->Get<double>("errorScale");
+    ROS_INFO_NAMED("multipath", "error scale set to %f\n", this->error_scale_);
   }
+  if (!this->sdf->HasElement("disableNoise"))
+  {
+    ROS_INFO_NAMED("multipath", "Default to disable gaussian noise");
+    this->disable_noise_ = true;
+  }
+  else
+  {
+    this->disable_noise_ = this->sdf->Get<bool>("disableNoise");
+    ROS_INFO_NAMED("multipath", "disable noise is %d\n", this->disable_noise_);
+  }
+
+  if (!this->sdf->HasElement("satNum"))
+  {
+    ROS_INFO_NAMED("multipath", "Multipath plugin missing <satNum>, defaults to 8");
+    this->num_sat_ = 8;
+  }
+  else{
+    this->num_sat_ = this->sdf->Get<int>("satNum");
+  }
+
+  // Allocate enough memory for the reflection rays
+  this->sat_dir_azimuth_.resize(this->num_sat_ * 2);
+  this->sat_dir_elevation_.resize(this->num_sat_ * 2);
+
+  if(!this->sdf->HasElement("satAzimuth"))
+  {
+    ROS_ERROR_NAMED("multipath", "Must provide azimuth of satellites");
+  }
+  else
+  {
+    std::string sat_az = this->sdf->Get<std::string>("satAzimuth");
+    std::istringstream ss(sat_az);
+    for (int i = 0; i < this->num_sat_; i++) {
+      double sat_az_i;
+      ss >> sat_az_i;
+      gzdbg << "azimuth " << i << ": " << sat_az_i << std::endl;
+
+      // direct and reflection as an adjacent pair in the vector
+      this->sat_dir_azimuth_[i*2] = sat_az_i;
+      this->sat_dir_azimuth_[i*2+1] = sat_az_i + M_PI; // assume reflection is 180 deg azimuth from the direct ray
+    }
+  }
+
+  if(!this->sdf->HasElement("satElevation"))
+  {
+    ROS_ERROR_NAMED("multipath", "Must provide elevation of satellites");
+  }
+  else
+  {
+    std::string sat_el = this->sdf->Get<std::string>("satElevation");
+    std::istringstream ss(sat_el);
+    for (int i = 0; i < this->num_sat_; i++) {
+      double sat_el_i;
+      ss >> sat_el_i;
+      gzdbg << "elevation "<< i << ": "<< sat_el_i << std::endl;
+
+      this->sat_dir_elevation_[i*2] = sat_el_i;
+      this->sat_dir_elevation_[i*2+1] = sat_el_i; // assume reflection has the same elevation as the direct ray
+    }
+  }
+
+  std::string parent_entity_name = this->parent_ray_sensor_->ParentName();
+  gzdbg << "parent model: " << parent_entity_name << std::endl;
+  this->parent_entity_ = this->world->EntityByName(parent_entity_name);
+  gzdbg << this->parent_entity_->WorldPose().Yaw() << std::endl;
 
   this->laser_connect_count_ = 0;
 
@@ -229,20 +294,9 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   laser_msg.header.frame_id = this->frame_name_;
   laser_msg.angle_min = _msg->scan().angle_min();
   laser_msg.angle_max = _msg->scan().angle_max();
-  //TODO Add ray angles from configuration file
-  //Consecutive Pairs(i and i+1) represents ray angles of satellite ray and the reflected ray. 
-  std::vector<float> pitch_angles(16,0), yaw_angles(16,0);
-  for (int i = 0 ; i < 16; i=i+2)
-  {
-    //Sattelite Ray Angles 
-    pitch_angles[i] = M_PI / 3;
-    yaw_angles[i] = M_PI * i / 8;
-    //Reflected Ray Angles 
-    pitch_angles[i+1] = M_PI / 3;
-    yaw_angles[i+1] = M_PI * i / 8 + M_PI;
-  }
+
   //Updating the ray angles for sateliite and reflected ray.
-  setRayAngles(this->parent_ray_sensor_->LaserShape(), pitch_angles, yaw_angles);
+  setRayAngles(this->parent_ray_sensor_->LaserShape(), this->sat_dir_elevation_, this->sat_dir_azimuth_);
   //Ray_ranges stores the ranges of both satellite and reflected rays.
   std::vector<float> ray_ranges; 
   ray_ranges.resize(_msg->scan().count());
@@ -255,14 +309,14 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   offset_msg.header.frame_id = this->frame_name_;
   offset_msg.offset.resize(3);
   //Counter for number of satellite rays with LOS 
-  int sat_ray_with_los = _msg->scan().count()/2;
+  int sat_ray_with_los = this->num_sat_;
 
   ignition::math::Vector3<float> dir_vec;
   ignition::math::Vector3<float> error_vec;
   for (int i=0; i < ray_ranges.size(); i=i+2)
   {
     float multipath_dist_increase = 0;
-    dir_vec = {cos(yaw_angles[i]), sin(yaw_angles[i]), 0};
+    dir_vec = {cos(this->sat_dir_azimuth_[i]), sin(this->sat_dir_azimuth_[i]), 0};
     //gzdbg << ray_ranges[i] << ray_ranges[i+1] << std::endl;
     // Check the LOS for sateliite ray
     if (ray_ranges[i] < _msg->scan().range_max()) 
@@ -275,18 +329,26 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
       if (mir_ray_range < _msg->scan().range_max()) // mirror ray exists
       {
         //Update the error vector to find the increase in the multipath distance 
-        multipath_dist_increase = mir_ray_range * ( 1 + sin(M_PI/2.0 - (pitch_angles[i]+pitch_angles[i+1])));
+        multipath_dist_increase = mir_ray_range * ( 1 + sin(M_PI/2.0 - (this->sat_dir_elevation_[i]+this->sat_dir_elevation_[i+1])));
         error_vec += dir_vec * multipath_dist_increase;
-        gzdbg << "ray index: " << i << " yaw angle:"<< yaw_angles[i] * 180.0/ M_PI<< " distance increase:"<<multipath_dist_increase 
-                  << " mirror_ray range:"<< mir_ray_range << std::endl;
+        // gzdbg << "ray index: " << i << " yaw angle:"<< this->sat_dir_azimuth_[i] * 180.0/ M_PI<< " distance increase:"<<multipath_dist_increase 
+        //           << " mirror_ray range:"<< mir_ray_range << std::endl;
       }
     }
   }
   // no multipath or LOS with 4 direct satellites -- add noise to mocap positions
-  offset_msg.offset[0] = ignition::math::Rand::DblNormal(0.0, 1.0);
-  offset_msg.offset[1] = ignition::math::Rand::DblNormal(0.0, 1.0);
-  offset_msg.offset[2] = ignition::math::Rand::DblNormal(0.0, 1.0);
-  
+  if (this->disable_noise_)
+  {
+    offset_msg.offset[0] = 0;
+    offset_msg.offset[0] = 0;
+    offset_msg.offset[0] = 0;
+  }
+  else
+  {
+    offset_msg.offset[0] = ignition::math::Rand::DblNormal(0.0, 1.0);
+    offset_msg.offset[1] = ignition::math::Rand::DblNormal(0.0, 1.0);
+    offset_msg.offset[2] = ignition::math::Rand::DblNormal(0.0, 1.0);
+  }
   // Adding multipath error when the satellite rays are less than 4
   if (sat_ray_with_los < 4)
   {
@@ -319,18 +381,20 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
 #endif
 }
 
-int MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<float> pitchAngles , std::vector<float> yawAngles)
+int MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth)
 { 
   ignition::math::Vector3d start, end, axis;
   ignition::math::Quaterniond ray;
-  for(unsigned int l=0; l < pitchAngles.size(); l++ ) 
+  for(unsigned int l=0; l < elevation.size(); l++ ) 
   {
-    double yawAngle = yawAngles[l];
-    double pitchAngle = pitchAngles[l];
+    double yawAngle = azimuth[l];
+    double pitchAngle = elevation[l];
     // since we're rotating a unit x vector, a pitch rotation will now be
     // around the negative y axis
+    
     ray.Euler(ignition::math::Vector3d(0.0, -pitchAngle, yawAngle));
-    axis = this->parent_ray_sensor_->Pose().Rot() * ray * ignition::math::Vector3d::UnitX;
+    axis = this->parent_entity_->WorldPose().Rot().Inverse() * this->parent_ray_sensor_->Pose().Rot() * ray * ignition::math::Vector3d::UnitX;
+    gzdbg << "axis_" << l << ": " << axis[0] << " " << axis[1] << " " << axis[2] << "\n"; 
     start = (axis * LaserShape->GetMinRange()) + this->parent_ray_sensor_->Pose().Pos();
     end = (axis * LaserShape->GetMaxRange()) + this->parent_ray_sensor_->Pose().Pos();
     LaserShape->SetRay(l, start, end);

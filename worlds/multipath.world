@@ -82,17 +82,11 @@
           <ray>
             <scan>
               <horizontal>
-                <samples>16</samples>
+                <samples>8</samples>
                 <resolution>1</resolution>
                 <min_angle>0</min_angle>
                 <max_angle>0</max_angle>
               </horizontal>
-              <vertical>
-                <samples>1</samples>
-                <resolution>1</resolution>
-                <min_angle>0.8</min_angle>
-                <max_angle>0.8</max_angle>
-              </vertical>
             </scan>
             <range>
               <min>0.05</min>
@@ -110,6 +104,10 @@
             <offsetTopicName>/multipath/offset</offsetTopicName>
             <frameName>laser_0</frameName>
             <errorScale>1</errorScale>
+            <disableNoise>1</disableNoise>
+            <satNum>8</satNum>
+            <satAzimuth>0 0.5 1 1.57 -1.57 -1 -0.5 3.14</satAzimuth>
+            <satElevation>0.8 0.8 0.8 0.8 0.8 0.8 0.8 0.8</satElevation>
           </plugin>
         </sensor>
         <self_collide>0</self_collide>

@@ -66,8 +66,10 @@ namespace gazebo
     GazeboRosPtr gazebo_ros_;
     private: std::string world_name_;
     private: physics::WorldPtr world_;
+    private: physics::EntityPtr parent_entity_;
     /// \brief The parent sensor
     private: sensors::RaySensorPtr parent_ray_sensor_;
+
 
     /// \brief pointer to ros node
     private: ros::NodeHandle* rosnode_;
@@ -84,7 +86,15 @@ namespace gazebo
     private: std::string frame_name_;
 
     /// \brief scale factor of error
-    private: float error_scale_;
+    private: double error_scale_;
+
+    /// \brief define properties of satellites
+    /// TODO: maybe get elevation and azimuth from satellite's lat lon and vehicle's position on earth
+    private: int num_sat_;
+    private: std::vector<double> sat_dir_elevation_;
+    private: std::vector<double> sat_dir_azimuth_;
+
+    private: bool disable_noise_;
 
     /// \brief tf prefix
     private: std::string tf_prefix_;
@@ -105,7 +115,7 @@ namespace gazebo
     private: PubMultiQueue pmq;
 
     /// return the mirror ray index of the current ray
-    private: int setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<float> pitchAngles , std::vector<float> yawAngles);
+    private: int setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth);
   };
 }
 #endif
