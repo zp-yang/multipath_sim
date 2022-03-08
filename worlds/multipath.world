@@ -77,7 +77,7 @@
         </collision>
         <sensor name="laser" type="ray">
           <pose>0 0 0.1 0 0 0</pose>
-          <visualize>true</visualize>
+          <visualize>false</visualize>
           <update_rate>20</update_rate>
           <ray>
             <scan>
