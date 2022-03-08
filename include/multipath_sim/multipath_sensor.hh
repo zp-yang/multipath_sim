@@ -119,7 +119,7 @@ namespace gazebo
     private: PubMultiQueue pmq;
 
     /// return the mirror ray index of the current ray
-    private: void setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth);
+    private: void setRayAngles(std::vector<double> &ray_ranges);
   };
 }
 #endif
