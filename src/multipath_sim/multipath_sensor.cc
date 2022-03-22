@@ -53,6 +53,39 @@ namespace gazebo
 // Register this plugin with the simulator
 GZ_REGISTER_SENSOR_PLUGIN(MultipathSimPlugin)
 
+struct Stats {
+  ignition::math::Vector3<double> mean;
+  ignition::math::Vector3<double> std;
+};
+
+bool measurement_comparison(ignition::math::Vector3<double> &a, ignition::math::Vector3<double> &b) {
+  return a.Length() < b.Length();
+}
+
+Stats compute_stats(std::vector<ignition::math::Vector3<double>> & measurements) {
+  // compute mean
+  ignition::math::Vector3<double> mean(0, 0, 0);
+  for (int i=0; i < measurements.size(); i++) {
+    mean += measurements[i];
+  }
+  mean /= measurements.size();
+
+  // compute standard deviation
+  ignition::math::Vector3<double> std(0, 0, 0);
+  for (int i=0; i < measurements.size(); i++) {
+    ignition::math::Vector3<double> a = measurements[i] - mean;
+    std += a*a;
+  }
+  std /= measurements.size();
+  for (int i=0; i<3; i++) {
+    std[i] = sqrt(std[i]);
+  }
+  Stats stats;
+  stats.mean = mean;
+  stats.std = std;
+  return stats;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Constructor
 MultipathSimPlugin::MultipathSimPlugin()
@@ -151,8 +184,8 @@ void MultipathSimPlugin::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
 
   if (!this->sdf->HasElement("satNum"))
   {
-    ROS_INFO_NAMED("multipath", "Multipath plugin missing <satNum>, defaults to 8");
-    this->num_sat_ = 8;
+    ROS_INFO_NAMED("multipath", "Multipath plugin missing <satNum>, defaults to 12");
+    this->num_sat_ = 12;
   }
   else{
     this->num_sat_ = this->sdf->Get<int>("satNum");
@@ -311,8 +344,6 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
   laser_msg.angle_min = _msg->scan().angle_min();
   laser_msg.angle_max = _msg->scan().angle_max();
 
-  //Updating the ray angles for sateliite and reflected ray.
-  setRayAngles(this->parent_ray_sensor_->LaserShape(), this->sat_dir_elevation_, this->sat_dir_azimuth_);
   //Ray_ranges stores the ranges of both satellite and reflected rays.
   std::vector<double> ray_ranges; 
   ray_ranges.resize(_msg->scan().count());
@@ -320,55 +351,114 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
             _msg->scan().ranges().end(),
             ray_ranges.begin());
 
+  //Updating the ray angles for sateliite and reflected ray.
+  setRayAngles(ray_ranges);
   multipath_sim::MultipathOffset offset_msg;
   offset_msg.header.stamp = ros::Time(_msg->time().sec(), _msg->time().nsec());
   offset_msg.header.frame_id = this->frame_name_;
   offset_msg.offset.resize(3);
-  //Counter for number of satellite rays with LOS 
-  int sat_ray_with_los = this->num_sat_;
+  int num_sat_blocked = 0;
 
   ignition::math::Vector3<double> dir_vec;
-  ignition::math::Vector3<double> error_vec;
+  std::vector<ignition::math::Vector3<double>> measurements;
   for (int i=0; i < ray_ranges.size(); i=i+2)
   {
-    double multipath_dist_increase = 0;
     dir_vec = {cos(this->sat_dir_azimuth_[i]), sin(this->sat_dir_azimuth_[i]), 0};
 
-    // Check the LOS for sateliite ray
-    if (ray_ranges[i] < _msg->scan().range_max()) 
+    // noise
+    ignition::math::Vector3<double> noise(0, 0, 0);
+    if (!this->disable_noise_)
     {
-      //Decrement the counter of the satellite ray with LOS.
-      sat_ray_with_los--;
-      //Check range of the mirror ray corresponding to the satellite ray 
-      double mir_ray_range = ray_ranges[i+1];
-      if (mir_ray_range < _msg->scan().range_max()) // mirror ray exists
-      {
-        //Update the error vector to find the increase in the multipath distance 
-        multipath_dist_increase = mir_ray_range * ( 1 + sin(M_PI/2.0 - (this->sat_dir_elevation_[i]+this->sat_dir_elevation_[i+1])));
-        error_vec += dir_vec * multipath_dist_increase;
+      for (int i=0; i<3; i++) {
+        noise[i] = ignition::math::Rand::DblNormal(0.0, 1.0);
       }
     }
+
+    // ray is obstructed
+    if (ray_ranges[i] < _msg->scan().range_max()) 
+    {
+      // check range of the mirror ray corresponding to the satellite ray 
+      double mir_ray_range = ray_ranges[i+1];
+
+      // check if mirror ray also is obstructed, providing a reflection
+      if (mir_ray_range < _msg->scan().range_max())
+      {
+        // update the measurement to add the multipath error 
+        ignition::math::Vector3<double> offset = mir_ray_range * ( 1 + sin(M_PI/2.0 - 2*this->sat_dir_elevation_[i]))*dir_vec;
+        measurements.push_back(offset + noise);
+      } else {
+        // otherwise no line of sight to any satellites and no reflections, no reading
+        num_sat_blocked++;
+      }
+      
+    } else {
+      // unobstructed sat reading
+      measurements.push_back(noise);
+    }
   }
-  // no multipath or LOS with 4 direct satellites -- add noise to mocap positions
-  if (this->disable_noise_)
-  {
-    offset_msg.offset[0] = 0;
-    offset_msg.offset[0] = 0;
-    offset_msg.offset[0] = 0;
+
+  std::sort(measurements.begin(), measurements.end(), measurement_comparison);
+
+  bool verbose=true;
+
+  if (verbose) {
+    gzdbg << std::endl;
+    gzdbg << "measurements:" << std::endl;
+    for (int i=0; i < measurements.size(); i++) {
+      gzdbg << i << ": " << measurements[i] << std::endl;
+    }
   }
-  else
-  {
-    offset_msg.offset[0] = ignition::math::Rand::DblNormal(0.0, 1.0);
-    offset_msg.offset[1] = ignition::math::Rand::DblNormal(0.0, 1.0);
-    offset_msg.offset[2] = ignition::math::Rand::DblNormal(0.0, 1.0);
+
+  Stats stats = compute_stats(measurements);
+  if (verbose) {
+    gzdbg << std::endl;
+    gzdbg << "mean: " << stats.mean << std::endl;
+    gzdbg << "std: " << stats.std << std::endl;
+    gzdbg << "number of satellites visible: " << measurements.size() << std::endl;
   }
-  // Adding multipath error when the satellite rays are less than 4
-  if (sat_ray_with_los < 4)
-  {
-    // averaging from all rays and applying error scaling
-    offset_msg.offset[0] += error_vec[0] / (_msg->scan().count()/2) * this->error_scale_;
-    offset_msg.offset[1] += error_vec[1] / (_msg->scan().count()/2) * this->error_scale_;
-    offset_msg.offset[2] += error_vec[2] / (_msg->scan().count()/2) * this->error_scale_;
+
+  // outlier rejection
+  double sigma_outlier_threshold = 2.0; // std dev threshold for determining outlier
+  std::vector<ignition::math::Vector3<double>> measurements_or;
+  for (int i=0; i < measurements.size(); i++) {
+    ignition::math::Vector3<double> a = measurements[i] - stats.mean;
+    bool outlier = false;
+    for (int i=0; i<3; i++) {
+      // if the standard deviation and we have enough satellites, mark it as an outlier
+      if (fabs(a[i]) > sigma_outlier_threshold*stats.std[i] && measurements_or.size() > 6) {
+        if (verbose) {
+          gzdbg << "outlier i: " << i << " error: " << a[i]
+            << " std: " << stats.std[i] << std::endl;
+        }
+        outlier = true;
+        break;
+      }
+    }
+    if (outlier) {
+      break;
+    }
+    measurements_or.push_back(measurements[i]);
+  }
+
+  if (verbose) {
+    gzdbg << std::endl;
+    gzdbg << "measurements, outliers removed:" << std::endl;
+    for (int i=0; i < measurements_or.size(); i++) {
+      gzdbg << i << ": " << measurements[i] << std::endl;
+    }
+  }
+
+  Stats stats_or = compute_stats(measurements_or);
+  if (verbose) {
+    gzdbg << std::endl;
+    gzdbg << "outlier rejection, mean: " << stats_or.mean << std::endl;
+    gzdbg << "outlier rejection, std: " << stats_or.std << std::endl;
+    gzdbg << "outlier rejection, number of satellites: " << measurements_or.size() << std::endl;
+  }
+
+  // averaging from all rays and applying error scaling
+  for (int i=0; i<3; i++) {
+    offset_msg.offset[i] += stats_or.mean[i] * this->error_scale_;
   }
   
   // custom multipath offset message
@@ -394,9 +484,12 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
 #endif
 }
 
-void MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std::vector<double> elevation , std::vector<double> azimuth)
+void MultipathSimPlugin::setRayAngles(std::vector<double> &ray_ranges) 
 { 
-  ignition::math::Vector3d start, end, axis;
+  physics::MultiRayShapePtr LaserShape = this->parent_ray_sensor_->LaserShape();
+  std::vector<double> &elevation = this->sat_dir_elevation_;
+  std::vector<double> &azimuth = this->sat_dir_azimuth_;
+  ignition::math::Vector3d start, end, axis, end_scan;
   ignition::math::Quaterniond ray;
   visualization_msgs::Marker line_list;
   line_list.header.frame_id = this->frame_name_;
@@ -420,6 +513,7 @@ void MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std:
     axis = this->parent_entity_->WorldPose().Rot().Inverse() * this->parent_ray_sensor_->Pose().Rot() * ray * ignition::math::Vector3d::UnitX;
     start = (axis * LaserShape->GetMinRange()) + this->parent_ray_sensor_->Pose().Pos();
     end = (axis * LaserShape->GetMaxRange()) + this->parent_ray_sensor_->Pose().Pos();
+    end_scan = (axis * std::min(LaserShape->GetMaxRange(), ray_ranges[l])) + this->parent_ray_sensor_->Pose().Pos();
     LaserShape->SetRay(l, start, end);
     if (!(l%2))
     {
@@ -428,9 +522,9 @@ void MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std:
       p.y = start.Y();
       p.z = start.Z();
       line_list.points.push_back(p);
-      p.x = end.X();
-      p.y = end.Y();
-      p.z = end.Z();
+      p.x = end_scan.X();
+      p.y = end_scan.Y();
+      p.z = end_scan.Z();
       line_list.points.push_back(p);
     }
   }
@@ -438,3 +532,5 @@ void MultipathSimPlugin::setRayAngles(physics::MultiRayShapePtr LaserShape, std:
 }
 
 }
+
+/* vim: set et fenc=utf-8 ff=unix sts=0 sw=2 ts=2 : */

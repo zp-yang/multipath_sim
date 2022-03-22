@@ -1,8 +1,8 @@
 <launch>
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="$(find multipath_sim)/worlds/abu_dhabi.world" /> <!-- Note: the world_name is with respect to GAZEBO_RESOURCE_PATH environmental variable -->
+    <arg name="world_name" value="$(find multipath_sim)/worlds/abu_dhabi_sim.world" /> <!-- Note: the world_name is with respect to GAZEBO_RESOURCE_PATH environmental variable -->
     <arg name="verbose" value="true" />
-    <arg name="paused" value="true" />
+    <arg name="paused" value="false" />
     <arg name="use_sim_time" value="true" />
     <arg name="gui" value="true" />
     <arg name="recording" value="false" />
@@ -10,7 +10,7 @@
     <arg name="server_required" value="true"/>
     <arg name="gui_required" value="true"/>
   </include>
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $find(multipath_sim)/config/multipath_sim.rviz"/>
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find multipath_sim)/config/multipath_sim.rviz"/>
   <node pkg="multipath_sim" name="set_model_state" type="set_model_state.py" output="screen"/>
   <node pkg="multipath_sim" name="multipath_error_vis" type="multipath_error_visualize.py" output="screen"/>
 </launch>

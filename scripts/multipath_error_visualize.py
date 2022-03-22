@@ -21,8 +21,9 @@ def cb_fn(data, cb_args):
     true_pose = get_model_pose("laser_0", "map")
     true_pos = np.array([true_pose.pose.position.x, true_pose.pose.position.y, true_pose.pose.position.z])
     affected_pos = true_pos + np.array(data.offset)
+    current_time = rospy.Time.now()
     t = TransformStamped()
-    t.header.stamp = rospy.Time.now()
+    t.header.stamp = current_time
     t.header.frame_id = "map"
     t.child_frame_id = "affected_pos"
     t.transform.translation.x = affected_pos[0]
@@ -34,8 +35,22 @@ def cb_fn(data, cb_args):
     t.transform.rotation.w = 1
     br.sendTransform(t)
 
+    t = TransformStamped()
+    t.header.stamp = current_time
+    t.header.frame_id = "map"
+    t.child_frame_id = "laser_0"
+    t.transform.translation.x = true_pose.pose.position.x
+    t.transform.translation.y = true_pose.pose.position.y
+    t.transform.translation.z = true_pose.pose.position.z
+    t.transform.rotation.x = true_pose.pose.orientation.x
+    t.transform.rotation.y = true_pose.pose.orientation.y
+    t.transform.rotation.z = true_pose.pose.orientation.z
+    t.transform.rotation.w = true_pose.pose.orientation.w
+    br.sendTransform(t)
+
+
     aff_odom = Odometry()
-    aff_odom.header.stamp = rospy.Time.now()
+    aff_odom.header.stamp = current_time
     aff_odom.header.frame_id = "map"
     aff_odom.child_frame_id = "hb1"
     aff_odom.pose.pose.position.x = affected_pos[0]

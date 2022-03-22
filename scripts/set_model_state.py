@@ -10,7 +10,6 @@ import rospkg
 from gazebo_msgs.msg import ModelState 
 from gazebo_msgs.srv import SetModelState
 import geometry_msgs.msg
-import tf2_ros
 from concurrent.futures import ThreadPoolExecutor
 
 from tf.transformations import quaternion_from_euler
@@ -49,7 +48,9 @@ def target_traj_straight(t, *args):
 
     max_dist = np.linalg.norm(begin-end)
     v_max = (end-begin) / duration
+    #print(v_max)
     pos = begin + v_max * (t - trip*duration)
+    #print(pos)
     att = np.array([0,0,0])
     # return pos
     return np.concatenate([pos, att])
@@ -63,7 +64,6 @@ def set_drone_state(*args):
     # end = args[3]
     # duration = args[4]
     
-    br = tf2_ros.TransformBroadcaster()
     state_msg_0 = ModelState()
     state_msg_0.model_name = model_name
     state_msg_0.pose.position.x = begin[0]
@@ -78,7 +78,7 @@ def set_drone_state(*args):
     start = rospy.get_rostime()
     elapsed = 0
     end_time = 60
-    rate = rospy.Rate(100)
+    rate = rospy.Rate(1000)
     while not rospy.is_shutdown():
     # while elapsed <= end_time:
         now = rospy.get_rostime()
@@ -99,18 +99,6 @@ def set_drone_state(*args):
             
             set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
             resp = set_state( state_msg_0 )
-            t = geometry_msgs.msg.TransformStamped()
-            t.header.stamp = rospy.Time.now()
-            t.header.frame_id = "map"
-            t.child_frame_id = model_name
-            t.transform.translation.x = state_msg_0.pose.position.x
-            t.transform.translation.y = state_msg_0.pose.position.y
-            t.transform.translation.z = state_msg_0.pose.position.z
-            t.transform.rotation.x = state_msg_0.pose.orientation.x
-            t.transform.rotation.y = state_msg_0.pose.orientation.y
-            t.transform.rotation.z = state_msg_0.pose.orientation.z
-            t.transform.rotation.w = state_msg_0.pose.orientation.w
-            br.sendTransform(t)
 
         except rospy.ServiceException as e:
             print("Service call failed: {:s}".format(str(e)))
@@ -119,7 +107,7 @@ def set_drone_state(*args):
 
 def main():
     rospy.init_node('set_pose')
-    x0_1 = np.array([-30, -0, 10])
+    x0_1 = np.array([-30, 5, 10])
     x0_2 = np.array([20, 5, 20])
 
     executor_args = [
@@ -131,7 +119,7 @@ def main():
     ]
     
     with ThreadPoolExecutor(max_workers=5) as tpe:
-        print("started")
+        #print("started")
         tpe.map(set_drone_state, executor_args)
 
     rospy.spin()
