@@ -42,8 +42,6 @@ def target_traj_straight(t, *args):
     duration = args[2]
     trip = int(t / duration)
 
-    print("args:", begin, end, duration)
-
     if (trip % 2): # odd trip
         temp = begin
         begin = end
@@ -51,9 +49,7 @@ def target_traj_straight(t, *args):
 
     max_dist = np.linalg.norm(begin-end)
     v_max = (end-begin) / duration
-    print(v_max)
     pos = begin + v_max * (t - trip*duration)
-    print(pos)
     att = np.array([0,0,0])
     # return pos
     return np.concatenate([pos, att])
@@ -63,7 +59,6 @@ def set_drone_state(*args):
     model_name = args[0]
     traj_fn = args[1]
     traj_fn_args = args[2]
-    print(traj_fn_args)
     begin = traj_fn_args[0]
     # end = args[3]
     # duration = args[4]
@@ -128,9 +123,9 @@ def main():
     x0_2 = np.array([20, 5, 20])
 
     executor_args = [
-        # ["laser_0", target_traj_straight, [x0_1, x0_1+[60,0,0], 30]],
+        ["laser_0", target_traj_straight, [x0_1, x0_1+[60,0,0], 30]],
         # ["laser_0", target_traj_stationary, [x0_1]],
-        ["laser_0", targeet_traj_rotate, [[0,0,0]]],
+        # ["laser_0", targeet_traj_rotate, [[0,0,0]]],
         # ["drone_1", target_traj_straight, [x0_2, x0_2+[-40,0,0], 30]],
         # ["drone_0", target_traj_circle, [[-10, 0, 18], [-10, 0, 18], 30]],
     ]
