@@ -10,7 +10,6 @@ import service_identity
 # print(msg)
 # print(msg.az_01)
 data_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir)) + "/data/hk_data" 
-data_file = data_dir + "/20210517.light-urban.tste.ublox.m8t.GC.nmea"
 
 def errhandler(err):
     """
@@ -89,7 +88,7 @@ def read_sv(stream):
         sv_set[key]["azim"] = np.array(sv_set[key]["azim"]).astype(float)
         sv_set[key]["mean"] = (np.mean(sv_set[key]["elev"]), np.mean(sv_set[key]["azim"]))
         # sv_set[key]["cno"] = np.array(sv_set[key]["cno"]).astype(float)
-        print(key, sv_set[key]["mean"])
+        print(key, "deg: ", sv_set[key]["mean"], "rad: ", np.deg2rad(sv_set[key]["mean"]))
 
     return sv_set, car_data
 
@@ -104,12 +103,14 @@ def test():
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    # filename = "/home/zpyang/git/gps_sim/src/multipath_sim/data/hk_data/20210517.light-urban.tste.ublox.m8t.GC.nmea"
-    filename = "/home/zpyang/git/gps_sim/src/multipath_sim/data/hk_data/20210517.light-urban.tste.ublox.f9p.nmea"
-    # filename = "/home/zpyang/git/gps_sim/src/multipath_sim/data/hk_data/20210517.light-urban.tste.ublox.m8t.GR.nmea"
-    # filename = "/home/zpyang/git/gps_sim/src/multipath_sim/data/hk_data/20210517.light-urban.tste.ublox.m8t.GEJ.nmea"
-    print(f"\nOpening file {filename}...\n")
-    with open(filename, "rb") as fstream:
+    # filename = "/20210517.light-urban.tste.ublox.m8t.GC.nmea"
+    filename = "/20210517.light-urban.tste.ublox.f9p.nmea"
+    # filename = "/20210517.light-urban.tste.ublox.m8t.GR.nmea"
+    # filename = "/20210517.light-urban.tste.ublox.m8t.GEJ.nmea"
+
+    data_file = data_dir + filename
+    print(f"\nOpening file {data_file} ...\n")
+    with open(data_file, "rb") as fstream:
         sv_set, car_data = read_sv(fstream)
         print(sv_set.keys())
         
