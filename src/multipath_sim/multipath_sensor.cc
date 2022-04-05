@@ -399,7 +399,7 @@ void MultipathSimPlugin::OnScan(ConstLaserScanStampedPtr &_msg)
 
   std::sort(measurements.begin(), measurements.end(), measurement_comparison);
 
-  bool verbose=true;
+  bool verbose=false;
 
   if (verbose) {
     gzdbg << std::endl;
