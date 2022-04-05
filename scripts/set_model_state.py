@@ -58,8 +58,8 @@ def target_traj_straight(t, *args):
 def target_traj_gps(t, *args):
     car_data_gzb = args[1]
     index = int(t % car_data_gzb.shape[0])
-    pos = [car_data_gzb[index,0], car_data_gzb[index,1], 0]
-    att = np.array([0,0,0])
+    pos = [car_data_gzb[index,0], car_data_gzb[index,1], 1]
+    att = np.array([0, 0, car_data_gzb[index, 2]])
     return np.concatenate([pos, att])
 
 def set_drone_state(*args):
@@ -130,6 +130,11 @@ def hk_preprocess():
 
     origin_offset = np.array([77, 15]) # adding offsets because of rounding error on bounds of the map
     car_data_gzb = car_data_utm - origin_utm + origin_offset
+
+    # NED (ground truth) to ENU (gzb)
+    car_data_heading = np.deg2rad(90 - np.array(car_data["heading"]))
+    car_data_gzb = np.vstack([car_data_gzb.T, car_data_heading]).T
+    
     return car_data_gzb
 
 def main():
@@ -137,7 +142,7 @@ def main():
     x0_1 = np.array([-30, 5, 10])
     x0_2 = np.array([20, 5, 20])
     car_data_gzb = hk_preprocess()
-    x0_car = np.array([car_data_gzb[0,0], car_data_gzb[0,1], 0])
+    x0_car = np.array([car_data_gzb[0,0], car_data_gzb[0,1], 1])
 
     # each executor_arg corresponds to a model in gazebo
     # each executor_arg should have 3 items [model_name, traj_fn_name, traj_fn_args]

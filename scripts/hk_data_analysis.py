@@ -9,24 +9,6 @@ import matplotlib.pyplot as plt
 import rosbag
 import os
 
-def bestpos_cb(data, args):
-    start = args[0]
-    end = args[1]
-    car_data = args[2]
-    elapsed = (rospy.get_rostime() - start).to_sec()
-    if elapsed > end:
-        rospy.signal_shutdown("fuck")
-
-    car_data["lat"].append(data.latitude)
-    car_data["lon"].append(data.longitude)
-    car_data["alt"].append(data.altitude)
-
-def m_per_lat(lat):
-    return 111132.92 - 559.82 * np.cos(2*lat) + 1.175 * np.cos(4*lat) - 0.0023 * np.cos(6*lat)
-
-def m_per_lon(lon):
-    return 111412.84 * np.cos(lon) - 93.5 * np.cos(3*lon) + 0.118 * np.cos(5*lon)
-
 def main():
     data_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir)) + "/data/" 
 
@@ -38,6 +20,7 @@ def main():
         "lat": [],
         "lon": [],
         "alt": [],
+        "heading": [],
     }
 
     topics=[
@@ -54,29 +37,13 @@ def main():
     
     for topic, data, t in bag.read_messages(topics=topics):
         t_list.append(t)
-        if topic == topics[0]:
-            num_sat.append(data.numSvs)
-            t_sat_list.append(t)
-            for sv in data.sv:
-                id = sv.svId
-                if id in sat_data:
-                    sat_data[id]["elev"].append(sv.elev)
-                    sat_data[id]["azim"].append(sv.azim)
-                    sat_data[id]["cno"].append(sv.cno)
-                    sat_data[id]["prRes"].append(sv.prRes)
-                else:
-                    sat_data[id] = {
-                        "elev": [sv.elev], 
-                        "azim": [sv.azim],
-                        "cno": [sv.cno],
-                        "prRes": [sv.prRes],
-                        }
 
-        elif topic == topics[1]:
+        if topic == topics[1]:
             t_car_list.append(t)
             car_data["lat"].append(data.latitude)
             car_data["lon"].append(data.longitude)
             car_data["alt"].append(data.altitude)
+            car_data["heading"].append(data.azimuth)
     
     # fig = plt.figure()
     # ax1 = plt.subplot(4,1,1)

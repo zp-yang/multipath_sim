@@ -1,3 +1,5 @@
+from multiprocessing.spawn import import_main_path
+from operator import imod
 from re import S
 from matplotlib.pyplot import subplot
 from pynmeagps import NMEAReader as nmr
@@ -63,8 +65,14 @@ def read_sv(stream):
                     elev = sv_payload[i+1]
                     azim = sv_payload[i+2]
                     cno = sv_payload[i+3]
+                    
+                    if cno == '': # carrier-to-noise ratio is null
+                        cno = -1
+                    
                     if not (elev == '' or azim == ''):
                         if sv_id in sv_set:
+                            elev = float(elev)
+                            azim = float(azim)
                             sv_set[sv_id]["elev"].append(elev)
                             sv_set[sv_id]["azim"].append(azim)
                             sv_set[sv_id]["cno"].append(cno)
@@ -76,19 +84,10 @@ def read_sv(stream):
                                 "cno": [cno],
                                 "time": [time_list[-1]],
                             }
-        except:
+        except Exception as e:
+            print(e)
             failed_ct += 1
     print(f"\n{msg_ct} messages read.\n{msg_ct - failed_ct} messages parsed")
-
-    car_data["lat"] = np.array(car_data["lat"]).astype(float)
-    car_data["lon"] = np.array(car_data["lon"]).astype(float)
-
-    for key in sv_set:
-        sv_set[key]["elev"] = np.array(sv_set[key]["elev"]).astype(float)
-        sv_set[key]["azim"] = np.array(sv_set[key]["azim"]).astype(float)
-        sv_set[key]["mean"] = (np.mean(sv_set[key]["elev"]), np.mean(sv_set[key]["azim"]))
-        # sv_set[key]["cno"] = np.array(sv_set[key]["cno"]).astype(float)
-        print(key, "deg: ", sv_set[key]["mean"], "rad: ", np.deg2rad(sv_set[key]["mean"]))
 
     return sv_set, car_data
 
@@ -103,29 +102,34 @@ def test():
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    import json
     # filename = "/20210517.light-urban.tste.ublox.m8t.GC.nmea"
-    filename = "/20210517.light-urban.tste.ublox.f9p.nmea"
+    # filename = "/20210517.light-urban.tste.ublox.f9p.nmea"
     # filename = "/20210517.light-urban.tste.ublox.m8t.GR.nmea"
-    # filename = "/20210517.light-urban.tste.ublox.m8t.GEJ.nmea"
+    filename = "/20210517.light-urban.tste.ublox.m8t.GEJ.nmea"
+    # filename = "/20210517.light-urban.tste.google.pixel4.nmea"
+    # filename = "/20210517.light-urban.tste.huawei.p40pro.nmea"
 
     data_file = data_dir + filename
     print(f"\nOpening file {data_file} ...\n")
     with open(data_file, "rb") as fstream:
         sv_set, car_data = read_sv(fstream)
         print(sv_set.keys())
+        with open(data_dir + "sv_set.json", "w") as fout:
+            json.dump(sv_set, fout)
         
-        # sv_id = "GP16"
-        # plt.figure()
-        # for sv_id in sv_set.keys():
-        #     plt.plot(sv_set[sv_id]["time"], np.array(sv_set[sv_id]["elev"]), label="elev")
-        #     plt.ylim((0,90))
-        #     plt.title("elevation")
-        # plt.figure()
-        # for sv_id in sv_set.keys():
-        #     plt.plot(sv_set[sv_id]["time"], np.array(sv_set[sv_id]["azim"]), label="azim")
-        #     plt.ylim((0,360))
-        #     plt.title("azimuth")
-        # # plt.legend()
+        car_data["lat"] = np.array(car_data["lat"]).astype(float)
+        car_data["lon"] = np.array(car_data["lon"]).astype(float)
+        print("num data point for lat-lon: ", len(car_data["lat"]))
+
+        for key in sv_set:
+            sv_set[key]["elev"] = np.array(sv_set[key]["elev"]).astype(float)
+            sv_set[key]["azim"] = np.array(sv_set[key]["azim"]).astype(float)
+            sv_set[key]["mean"] = np.array([np.mean(sv_set[key]["elev"]), np.mean(sv_set[key]["azim"])])
+            sv_set[key]["cno"] = np.array(sv_set[key]["cno"]).astype(float)
+            
+            print(key, "deg: ", sv_set[key]["mean"], "rad: ", np.deg2rad(sv_set[key]["mean"]))
+            print("num data point for sv: ", len(sv_set[key]["cno"]))
 
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
         for sv_id in sv_set.keys():
