@@ -58,7 +58,7 @@ def target_traj_straight(t, *args):
 def hk_traj(t,args):
     car_data_gzb = args
     index = int(t % car_data_gzb.shape[0])
-    pos = [car_data_gzb[index,0],car_data_gzb[index,1],0]
+    pos = [car_data_gzb[index,0]+70,car_data_gzb[index,1]+15,0]
     att = np.array([0,0,0])
     return np.concatenate([pos, att])
 
@@ -97,8 +97,8 @@ def set_drone_state(*args):
         rospy.wait_for_service('/gazebo/set_model_state')
         try:
             #pose = traj_fn(elapsed, *traj_fn_args)
-            pose = traj_fn(elapsed, traj_fn_args)
-            print(elapsed, pose)
+            pose = traj_fn(elapsed*10, traj_fn_args)
+            #print(elapsed, pose)
             state_msg_0.pose.position.x = pose[0]
             state_msg_0.pose.position.y = pose[1]
             state_msg_0.pose.position.z = pose[2]
@@ -121,7 +121,7 @@ def hk_preprocess():
     data_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir)) + "/data/" 
     lat_bound = np.array([22.3066, 22.2903])
     lon_bound = np.array([114.171, 114.188])
-    origin_x = lon_bound[0] + (lon_bound[1]-lon_bound[0])/2.0
+    origin_x = lon_bound[0] + (lon_bound[1]-lon_bound[0])/2.0 
     origin_y = lat_bound[0] + (lat_bound[1]-lat_bound[0])/2.0
     origin = np.array([origin_x, origin_y])
     origin_utm = utm.from_latlon(origin_y, origin_x)
