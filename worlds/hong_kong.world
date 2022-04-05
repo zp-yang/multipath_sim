@@ -53,7 +53,7 @@
         <visual name="visual">
           <geometry>
             <box>
-              <size>0.2 0.1 0.1</size>
+              <size>10 5 5</size>
             </box>
           </geometry>
         </visual>
@@ -112,7 +112,12 @@
         <self_collide>0</self_collide>
       </link>
     </model>
-
+    <gui>
+      <camera name="user_camera">
+        <projection_type>orthographic</projection_type>
+        <pose>1.5 -1.25 0 0 1.578 0</pose>
+      </camera>
+    </gui>
     <gui fullscreen='0'>
       <camera name='user_camera'>
         <pose>0 0 3000 0 1.57 0</pose>
