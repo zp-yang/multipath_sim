@@ -7,10 +7,6 @@ import os
 import numpy as np
 import service_identity
 
-
-# msg = NMEAReader.parse("$GPGSV,4,1,14,01,42,170,29,03,00,176,,04,21,196,18,07,56,321,15*70")
-# print(msg)
-# print(msg.az_01)
 data_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir)) + "/data/hk_data" 
 
 def errhandler(err):
@@ -115,21 +111,29 @@ if __name__ == "__main__":
     with open(data_file, "rb") as fstream:
         sv_set, car_data = read_sv(fstream)
         print(sv_set.keys())
-        with open(data_dir + "sv_set.json", "w") as fout:
-            json.dump(sv_set, fout)
         
         car_data["lat"] = np.array(car_data["lat"]).astype(float)
         car_data["lon"] = np.array(car_data["lon"]).astype(float)
         print("num data point for lat-lon: ", len(car_data["lat"]))
 
+        sv_data = {}
         for key in sv_set:
+
             sv_set[key]["elev"] = np.array(sv_set[key]["elev"]).astype(float)
             sv_set[key]["azim"] = np.array(sv_set[key]["azim"]).astype(float)
             sv_set[key]["mean"] = np.array([np.mean(sv_set[key]["elev"]), np.mean(sv_set[key]["azim"])])
             sv_set[key]["cno"] = np.array(sv_set[key]["cno"]).astype(float)
-            
+
+            sv_data[key] = {
+                "mean": sv_set[key]["mean"].tolist(), 
+                # "cno": sv_set[key]["cno"].tolist(),
+            }
+
             print(key, "deg: ", sv_set[key]["mean"], "rad: ", np.deg2rad(sv_set[key]["mean"]))
             print("num data point for sv: ", len(sv_set[key]["cno"]))
+
+        with open(data_dir + "_sv_mean.json", "w") as fout:
+            json.dump(sv_data, fout)
 
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
         for sv_id in sv_set.keys():
