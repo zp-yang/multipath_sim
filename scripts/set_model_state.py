@@ -57,7 +57,7 @@ def target_traj_straight(t, *args):
 
 def target_traj_gps(t, *args):
     car_data_gzb = args[1]
-    index = int(t % car_data_gzb.shape[0])
+    index = int(t*10 % car_data_gzb.shape[0])
     pos = [car_data_gzb[index,0], car_data_gzb[index,1], 1]
     att = np.array([0, 0, car_data_gzb[index, 2]])
     return np.concatenate([pos, att])
@@ -94,7 +94,7 @@ def set_drone_state(*args):
         rospy.wait_for_service('/gazebo/set_model_state')
         try:
             #pose = traj_fn(elapsed, *traj_fn_args)
-            pose = traj_fn(elapsed*10, *traj_fn_args)
+            pose = traj_fn(elapsed, *traj_fn_args)
             #print(elapsed, pose)
             state_msg_0.pose.position.x = pose[0]
             state_msg_0.pose.position.y = pose[1]

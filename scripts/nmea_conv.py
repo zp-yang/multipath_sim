@@ -126,7 +126,8 @@ if __name__ == "__main__":
 
             sv_data[key] = {
                 "mean": sv_set[key]["mean"].tolist(), 
-                # "cno": sv_set[key]["cno"].tolist(),
+                "cno": sv_set[key]["cno"].tolist(),
+                "cno_max": np.max(sv_set[key]["cno"])
             }
 
             print(key, "deg: ", sv_set[key]["mean"], "rad: ", np.deg2rad(sv_set[key]["mean"]))

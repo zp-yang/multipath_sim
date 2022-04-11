@@ -12,7 +12,7 @@
     </include>
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find multipath_sim)/config/hk_sim.rviz"/>
     <node pkg="multipath_sim" name="set_model_state" type="set_model_state.py" output="screen"/>
-    <!-- <node pkg="multipath_sim" name="stream_skycam" type="stream_skycam.py" output="screen"/> -->
+    <node pkg="multipath_sim" name="stream_skycam" type="stream_skycam.py" output="screen"/>
     
     <!-- <node pkg="multipath_sim" name="multipath_error_vis" type="multipath_error_visualize.py" output="screen"/> -->
 
