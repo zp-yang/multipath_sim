@@ -1,11 +1,6 @@
-from multiprocessing.spawn import import_main_path
-from operator import imod
-from re import S
-from matplotlib.pyplot import subplot
 from pynmeagps import NMEAReader as nmr
 import os
 import numpy as np
-import service_identity
 
 data_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir)) + "/data/hk_data" 
 
@@ -47,7 +42,7 @@ def read_sv(stream):
                 if not (msg.lon == '' and msg.lat== ''):
                     car_data["lon"].append(msg.lon)
                     car_data["lat"].append(msg.lat)
-                car_data["time"].append(time)
+                    car_data["time"].append(time)
 
             if msg_id == "GSV":
                 sv_num_msgs = msg.numMsg
@@ -116,6 +111,10 @@ if __name__ == "__main__":
         car_data["lon"] = np.array(car_data["lon"]).astype(float)
         print("num data point for lat-lon: ", len(car_data["lat"]))
 
+        # with open(data_dir + "_car_gps_log.json", "w") as fout:
+        #     data = {"lat": car_data["lat"].tolist(), "lon": car_data["lon"].tolist()}
+        #     json.dump(data, fout)
+
         sv_data = {}
         for key in sv_set:
 
@@ -145,8 +144,14 @@ if __name__ == "__main__":
 
         plt.figure()
         plt.plot(car_data["lon"], car_data["lat"], '.')
-        plt.xlabel("lon")
-        plt.ylabel("lat")
+        plt.figure()
+        plt.subplot(2,1,1)
+        plt.plot(car_data["time"], car_data["lon"], label="lon")
+        plt.legend()
+        plt.subplot(2,1,2)
+        plt.plot(car_data["time"], car_data["lat"], label="lat")
+        plt.xlabel("time")
+        plt.legend()
 
         plt.show()
 

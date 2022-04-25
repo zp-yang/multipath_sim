@@ -48,6 +48,8 @@ def img_sub_cb(data, cb_args):
     heading = np.pi/2 - model_euler[2]
 
     cv_img = bridge.imgmsg_to_cv2(data, "bgr8")
+    cv_img = np.array(np.flip(cv_img, axis=0))
+    
     img_height = cv_img.shape[0]
     img_width = cv_img.shape[1]
     img_center = np.array([img_height/2.0, img_width/2.0]) # [250 250]
@@ -77,6 +79,7 @@ def img_sub_cb(data, cb_args):
 
         cv2.circle(cv_img, (x, y), 10, (0, int((cno)/cno_max*255), int((cno_max-cno)/cno_max*255)/2), -1)
         cv2.circle(cv_img, (x, y), 11, (0, 0, 255), 2)
+        cv2.putText(cv_img, sv_id, (x-10, y-15), cv2.FONT_HERSHEY_SIMPLEX, 0.3, green, 1)
     
     nesw = ["N", "E", "S", "W"]
     for i in range(4):

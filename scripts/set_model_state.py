@@ -3,14 +3,13 @@ import os
 import numpy as np
 from numpy.core.arrayprint import printoptions
 from numpy.linalg import pinv
-from genpy.rostime import Duration
+
 import rospy 
 from gazebo_msgs.msg import ModelState 
 from gazebo_msgs.srv import SetModelState
 import geometry_msgs.msg
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
-import utm
 import json
 from tf.transformations import quaternion_from_euler
 
@@ -114,6 +113,7 @@ def set_drone_state(*args):
         rate.sleep()
 
 def hk_preprocess():
+    import utm
     data_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir)) + "/data/" 
     lat_bound = np.array([22.3066, 22.2903])
     lon_bound = np.array([114.171, 114.188])
